@@ -76,12 +76,19 @@ class VOC2012Loader(DataLoader):
 
     @classmethod
     def read_image_array(self, path):
-        return cv2.imread(path)[:, :, ::-1]
+        array = cv2.imread(path)
+        array = cv2.resize(array, (448, 448))
+        return array[:, :, ::-1]
 
     @classmethod
     def read_objects(cls, path):
         res = []
         dom = minidom.parse(path)
+
+        size = dom.getElementsByTagName('size')[0]
+        w_abs = eval(size.getElementsByTagName('width')[0].firstChild.data)
+        h_abs = eval(size.getElementsByTagName('height')[0].firstChild.data)
+
         objects = dom.getElementsByTagName('object')
         for o in objects:
             name = o.getElementsByTagName('name')[0].firstChild.data
@@ -90,10 +97,10 @@ class VOC2012Loader(DataLoader):
             ymin = eval(box.getElementsByTagName('ymin')[0].firstChild.data)
             xmax = eval(box.getElementsByTagName('xmax')[0].firstChild.data)
             ymax = eval(box.getElementsByTagName('ymax')[0].firstChild.data)
-            x = (xmin + xmax) / 2
-            y = (ymin + ymax) / 2
-            w = xmax - xmin
-            h = ymax - ymin
+            x = int(((xmin + xmax) / 2 - 1) / (w_abs - 1) * 448)
+            y = int(((ymin + ymax) / 2 - 1) / (h_abs - 1) * 448)
+            w = (xmax - xmin) / (w_abs - 1) * 448
+            h = (ymax - ymin) / (h_abs - 1) * 448
             res.append(dict(name=name, x=x, y=y, w=w, h=h))
         return res
 
