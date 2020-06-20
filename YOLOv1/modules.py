@@ -4,7 +4,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class YOLOv1(nn.Module):
+class YOLOv1Backbone(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(3, 64, 7, stride=2, padding=3)
@@ -52,44 +52,47 @@ class YOLOv1(nn.Module):
 
         self.fc1 = nn.Linear(1024 * 7 * 7, 4096, bias=True)
         self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(4096, 30 * 7 * 7, bias=True)
+        self.fc2 = nn.Linear(4096, 7 * 7 * 30, bias=True)
 
     def forward(self, x):
+        """448 * 448 * 3"""
+        x = x.permute(0, 3, 1, 2).float()
         """3 * 448 * 448"""
         x = self.conv1(x)
         x = self.batch_norm1(x)
-        x = F.leaky_relu(x)
+        x = F.leaky_relu(x, 0.1)
         x = self.pool1(x)
         """64 * 112 * 112"""
         x = self.conv2(x)
         x = self.batch_norm2(x)
-        x = F.leaky_relu(x)
+        x = F.leaky_relu(x, 0.1)
         x = self.pool2(x)
         """192 * 56 * 56"""
         for i in range(3, 7):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x)
+            x = F.leaky_relu(x, 0.1)
         x = self.pool3(x)
         """512 * 28 * 28"""
         for i in range(7, 17):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x)
+            x = F.leaky_relu(x, 0.1)
         x = self.pool4(x)
         """1024 * 14 * 14"""
         for i in range(17, 25):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x)
+            x = F.leaky_relu(x, 0.1)
         """1024 * 7 * 7"""
         x = x.view(-1, 1024 * 7 * 7)
         """50176"""
         x = self.fc1(x)
         x = self.dropout(x)
-        x = F.leaky_relu(x)
+        x = F.leaky_relu(x, 0.1)
         """4096"""
         x = self.fc2(x)
         """1470"""
-        x = x.view(-1, 30, 7, 7)
+        x = x.view(-1, 7, 7, 30)
+        """30 * 7 * 7"""
         return x
