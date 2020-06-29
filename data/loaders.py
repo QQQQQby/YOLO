@@ -39,7 +39,7 @@ class VOC2012Loader(DataLoader):
         file_names = os.listdir(os.path.join(self.get_path(), "VOC2012", "train", "JPEGImages"))
         file_names = [name.replace('.jpg', '') for name in file_names]
 
-        file_names = file_names[:2000]
+        file_names = file_names[:200]
 
         split_index = int(train_prop * len(file_names))
         self.train_file_names = file_names[:split_index]
@@ -97,10 +97,10 @@ class VOC2012Loader(DataLoader):
             ymin = eval(box.getElementsByTagName('ymin')[0].firstChild.data)
             xmax = eval(box.getElementsByTagName('xmax')[0].firstChild.data)
             ymax = eval(box.getElementsByTagName('ymax')[0].firstChild.data)
-            x = int(((xmin + xmax) / 2 - 1) / (w_abs - 1) * 448)
-            y = int(((ymin + ymax) / 2 - 1) / (h_abs - 1) * 448)
-            w = (xmax - xmin) / (w_abs - 1) * 448
-            h = (ymax - ymin) / (h_abs - 1) * 448
+            x = int(((xmin + xmax) / 2 - 1) / (w_abs - 1) * (448 - 1))
+            y = int(((ymin + ymax) / 2 - 1) / (h_abs - 1) * (448 - 1))
+            w = int((xmax - xmin) / w_abs * 448)
+            h = int((ymax - ymin) / h_abs * 448)
             res.append(dict(name=name, x=x, y=y, w=w, h=h))
         return res
 

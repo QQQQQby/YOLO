@@ -9,4 +9,5 @@ def iou(bbox0, bbox1, max_width, max_height):
     inter_lower_right = (min(lower_right0[0], lower_right1[0]), min(lower_right0[1], lower_right1[1]))
     inter_area = 0 if inter_upper_left[0] > inter_lower_right[0] or inter_upper_left[1] > inter_lower_right[1] \
         else (inter_lower_right[0] - inter_upper_left[0] + 1) * (inter_lower_right[1] - inter_upper_left[1] + 1)
-    return inter_area
+    outer_area = bbox0[2] * bbox0[3] + bbox1[2] * bbox1[3]
+    return inter_area / outer_area

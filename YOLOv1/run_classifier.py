@@ -1,4 +1,5 @@
 # coding: utf-8
+import torch
 import argparse
 import os
 import time
@@ -18,6 +19,9 @@ class Classifier:
         print("}")
         self.args = args.copy()
 
+        if self.args["use_cuda"] and torch.cuda.is_available():
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
         print('-' * 20 + 'Reading data' + '-' * 20, flush=True)
         data_loader = VOC2012Loader(args["dataset_path"])
         self.data_train = data_loader.get_data_train()
@@ -25,7 +29,13 @@ class Classifier:
         self.data_test = data_loader.get_data_test()
         self.labels = data_loader.get_labels()
 
-        self.model = YOLOv1(self.labels)
+        self.model = YOLOv1(
+            self.labels,
+            self.args["lr"],
+            self.args["momentum"],
+            self.args["lambda_coord"],
+            self.args["lambda_noobj"],
+            self.args["use_cuda"])
 
     def run(self):
         if not os.path.exists(self.args["output_path"]):
@@ -90,28 +100,36 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
-    parser.add_argument('--output_path', type=str, default='./output/1000_0.01_dropout0.7',
+    parser.add_argument('--output_path', type=str, default='../output/1000_0.01_dropout0.7',
                         help='Output path.')
+    parser.add_argument('--use_cuda', action='store_true', default=False,
+                        help="Whether to use cuda to run the model.")
 
     parser.add_argument('--not_train', action='store_true', default=False,
                         help="Whether not to train the model.")
     parser.add_argument('--save', action='store_true', default=False,
                         help="Whether to save the model after training.")
-    parser.add_argument('--train_batch_size', type=int, default=1000,
+    parser.add_argument('--train_batch_size', type=int, default=1,
                         help='Batch size of train set.')
     parser.add_argument('--epochs', type=int, default=20,
                         help='Number of epochs.')
-    parser.add_argument('--lr', type=float, default=0.01,
+    parser.add_argument('--lr', type=float, default=0.0005,
                         help='Learning rate.')
+    parser.add_argument('--momentum', type=float, default=0.9,
+                        help='Momentum of optimizer.')
+    parser.add_argument('--lambda_coord', type=float, default=5,
+                        help='Lambda of coordinates.')
+    parser.add_argument('--lambda_noobj', type=float, default=5,
+                        help='Lambda with no objects.')
 
     parser.add_argument('--not_eval', action='store_true', default=False,
                         help="Whether not to evaluate the model.")
-    parser.add_argument('--dev_batch_size', type=int, default=2000,
+    parser.add_argument('--dev_batch_size', type=int, default=1,
                         help='Batch size of dev set.')
 
     parser.add_argument('--not_test', action='store_true', default=False,
                         help="Whether not to test the model.")
-    parser.add_argument('--test_batch_size', type=int, default=2000,
+    parser.add_argument('--test_batch_size', type=int, default=1,
                         help='Batch size of test set.')
     args = parser.parse_args()
     return args.__dict__
@@ -120,3 +138,4 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
     classifier = Classifier(args)
+    classifier.run()

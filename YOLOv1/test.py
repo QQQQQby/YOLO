@@ -4,11 +4,13 @@ import torch
 from torch import nn
 from xml.dom import minidom
 import cv2
+from tqdm import tqdm
 import numpy as np
 import argparse
+import os
 
 from YOLOv1.modules import YOLOv1Backbone
-# from YOLOv1.models import YOLOv1
+from YOLOv1.models import YOLOv1
 from data.loaders import VOC2012Loader
 
 
@@ -66,8 +68,16 @@ def parse_args():
 
 
 if __name__ == '__main__':
-    # if torch.cuda.is_available():
-    #     torch.set_default_tensor_type('torch.cuda.FloatTensor')
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    if torch.cuda.is_available():
+        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
+    # a = torch.zeros(3)
+    # b = torch.tensor([2, 3, 5], dtype=torch.float)
+    # loss = nn.MSELoss(reduction="sum")
+    # print(a, b, loss(a, b))
+    # exit(-1)
+
     # torch.manual_seed(1)
     # m = YOLOv1Backbone()
     # d = torch.rand(8, 3, 448, 448)
@@ -101,12 +111,13 @@ if __name__ == '__main__':
 
     a = loader.get_data_dev()
 
-    for i in range(200):
-        show_objects(a[i][0], a[i][1], color_dict)
+    # for i in range(200):
+    #     show_objects(a[i][0], a[i][1], color_dict)
 
     m = YOLOv1(["person",
                 "bird", "cat", "cow", "dog", "horse", "sheep",
                 "aeroplane", "bicycle", "boat", "bus", "car", "motorbike", "train",
                 "bottle", "chair", "diningtable", "pottedplant", "sofa", "tvmonitor"], 5, 5)
 
-    # m.train(a[:5])
+    for i in tqdm(range(5)):
+        m.train([a[i]])
