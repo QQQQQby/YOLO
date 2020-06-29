@@ -35,7 +35,8 @@ class Classifier:
             self.args["momentum"],
             self.args["lambda_coord"],
             self.args["lambda_noobj"],
-            self.args["use_cuda"])
+            self.args["use_cuda"],
+            self.args["output_path"])
 
     def run(self):
         if not os.path.exists(self.args["output_path"]):
@@ -100,7 +101,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
-    parser.add_argument('--output_path', type=str, default='../output/1000_0.01_dropout0.7',
+    parser.add_argument('--output_path', type=str, default='../output/test/',
                         help='Output path.')
     parser.add_argument('--use_cuda', action='store_true', default=False,
                         help="Whether to use cuda to run the model.")

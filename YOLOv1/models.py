@@ -1,15 +1,16 @@
 # coding: utf-8
+
 from YOLOv1.modules import YOLOv1Backbone
 from util.functions import iou
 
 import torch
 from torch import nn, optim
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 
 
 class YOLOv1:
-    def __init__(self, labels, lr,momentum, lambda_coord, lambda_noobj, use_cuda):
+    def __init__(self, labels, lr, momentum, lambda_coord, lambda_noobj, use_cuda, output_path):
         self.labels = labels
         self.lr = lr
         self.momentum = momentum
@@ -18,6 +19,8 @@ class YOLOv1:
 
         self.device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
         self.backbone = YOLOv1Backbone().to(self.device)
+        with SummaryWriter(log_dir=output_path) as writer:
+            writer.add_graph(self.backbone, [torch.rand(3,  448, 448, 3)])
 
         # self.op = optim.SGD(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
         self.op = optim.Adam(self.backbone.parameters(), lr=self.lr)
@@ -25,11 +28,11 @@ class YOLOv1:
 
     def predict(self, batch):
         pass
+        # for d in batch:
+
 
     def train(self, batch):
         self.backbone.train()
-        # with SummaryWriter(log_dir='./log') as writer:
-        #     writer.add_graph(self.backbone, [torch.rand(3,3, 448, 448)])
         loss = self.get_loss(batch)
         loss.backward()
         self.op.step()
@@ -99,8 +102,6 @@ class YOLOv1:
                     loss += (output_dict['c1'][data_id, row, col] - 1) ** 2 + \
                             self.lambda_noobj * (output_dict['c0'][data_id, row, col] - 0) ** 2
                 """概率损失"""
-                print(iou0,iou1)
-
                 prob_loss = nn.MSELoss(reduction="sum")
                 true_porbs = torch.zeros((20,))
                 true_porbs[self.labels.index(true_dict['name'])] = 1
