@@ -1,4 +1,5 @@
 # coding: utf-8
+
 import torch
 import argparse
 import os
@@ -29,6 +30,9 @@ class Classifier:
         self.data_test = data_loader.get_data_test()
         self.labels = data_loader.get_labels()
 
+        if not os.path.exists(self.args["output_path"]):
+            os.makedirs(self.args["output_path"])
+
         self.model = YOLOv1(
             self.labels,
             self.args["lr"],
@@ -36,7 +40,8 @@ class Classifier:
             self.args["lambda_coord"],
             self.args["lambda_noobj"],
             self.args["use_cuda"],
-            self.args["output_path"])
+            self.args["output_path"]
+        )
 
     def run(self):
         if not os.path.exists(self.args["output_path"]):
@@ -45,36 +50,32 @@ class Classifier:
             if not self.args["not_train"]:
                 """Train"""
                 print('-' * 20 + 'Training epoch %d' % epoch + '-' * 20, flush=True)
-                time.sleep(0.1)
-                # m = metrics.Metrics(self.labels)
-                random.shuffle(self.data_train)
-                for start in tqdm(range(0, len(self.data_train), self.args["train_batch_size"]),
-                                  desc='Training batch: '):
+                time.sleep(0.5)
+                random.shuffle(self.data_train)  # 打乱训练数据
+                for start in tqdm(
+                        range(0, len(self.data_train), self.args["train_batch_size"]),
+                        desc='Training batch: '
+                ):
                     self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
-                    # """update confusion matrix"""
-                    # pred_labels = outputs.softmax(1).argmax(1).tolist()
-                    # m.update(actual_labels, pred_labels)
-                # print(m.get_accuracy())
                 if self.args["save"]:
-                    self.save(epoch)
+                    self.model.save(os.path.join(self.args["output_path"], str(epoch) + ".pd"))
 
+            continue
             if not self.args["not_eval"]:
                 """Eval"""
                 print('-' * 20 + 'Evaluating epoch %d' % epoch + '-' * 20, flush=True)
-                time.sleep(0.1)
-                m = metrics.Metrics(self.labels)
-                for start in tqdm(range(0, len(self.data_dev), self.args["dev_batch_size"]),
-                                  desc='Evaluating batch: '):
+                time.sleep(0.5)
+                for start in tqdm(
+                        range(0, len(self.data_dev), self.args["dev_batch_size"]),
+                        desc='Evaluating batch: '
+                ):
                     images = [d[0] for d in self.data_dev[start:start + self.args["dev_batch_size"]]]
                     actual_labels = [d[1] for d in self.data_dev[start:start + self.args["dev_batch_size"]]]
                     """forward"""
                     batch_images = torch.tensor(images, dtype=torch.float32)
                     outputs = self.model(batch_images)
                     """update confusion matrix"""
-                    pred_labels = outputs.softmax(1).argmax(1).tolist()
-                    m.update(actual_labels, pred_labels)
                 """evaluate"""
-                print(m.get_accuracy())
 
             if not self.args.not_test:
                 pass
@@ -110,7 +111,7 @@ def parse_args():
                         help="Whether not to train the model.")
     parser.add_argument('--save', action='store_true', default=False,
                         help="Whether to save the model after training.")
-    parser.add_argument('--train_batch_size', type=int, default=1,
+    parser.add_argument('--train_batch_size', type=int, default=32,
                         help='Batch size of train set.')
     parser.add_argument('--epochs', type=int, default=20,
                         help='Number of epochs.')
@@ -125,12 +126,12 @@ def parse_args():
 
     parser.add_argument('--not_eval', action='store_true', default=False,
                         help="Whether not to evaluate the model.")
-    parser.add_argument('--dev_batch_size', type=int, default=1,
+    parser.add_argument('--dev_batch_size', type=int, default=32,
                         help='Batch size of dev set.')
 
     parser.add_argument('--not_test', action='store_true', default=False,
                         help="Whether not to test the model.")
-    parser.add_argument('--test_batch_size', type=int, default=1,
+    parser.add_argument('--test_batch_size', type=int, default=32,
                         help='Batch size of test set.')
     args = parser.parse_args()
     return args.__dict__
