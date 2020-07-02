@@ -9,7 +9,31 @@ from tqdm import tqdm
 
 from data.loaders import VOC2012Loader
 from util import metrics
+from util.functions import show_objects
 from YOLOv1.models import YOLOv1
+
+color_dict = {
+    "person": (255, 0, 0),
+    "bird": (112, 128, 105),
+    "cat": (56, 94, 15),
+    "cow": (8, 46, 84),
+    "dog": (210, 105, 30),
+    "horse": (128, 42, 42),
+    "sheep": (255, 250, 250),
+    "aeroplane": (0, 255, 255),
+    "bicycle": (255, 235, 205),
+    "boat": (210, 180, 140),
+    "bus": (220, 220, 220),
+    "car": (0, 0, 255),
+    "motorbike": (250, 255, 240),
+    "train": (127, 255, 212),
+    "bottle": (51, 161, 201),
+    "chair": (139, 69, 19),
+    "diningtable": (115, 74, 18),
+    "pottedplant": (46, 139, 87),
+    "sofa": (160, 32, 240),
+    "tvmonitor": (65, 105, 225)
+}
 
 
 class Classifier:
@@ -20,9 +44,6 @@ class Classifier:
         print("}")
         self.args = args.copy()
 
-        if self.args["use_cuda"] and torch.cuda.is_available():
-            torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
         print('-' * 20 + 'Reading data' + '-' * 20, flush=True)
         data_loader = VOC2012Loader(args["dataset_path"])
         self.data_train = data_loader.get_data_train()
@@ -30,8 +51,12 @@ class Classifier:
         self.data_test = data_loader.get_data_test()
         self.labels = data_loader.get_labels()
 
-        if not os.path.exists(self.args["output_path"]):
-            os.makedirs(self.args["output_path"])
+        if self.args["use_cuda"] and torch.cuda.is_available():
+            torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        if not os.path.exists(self.args["model_save_dir"]):
+            os.makedirs(self.args["model_save_dir"])
+        if not os.path.exists(self.args["log_save_dir"]):
+            os.makedirs(self.args["log_save_dir"])
 
         self.model = YOLOv1(
             self.labels,
@@ -40,13 +65,15 @@ class Classifier:
             self.args["lambda_coord"],
             self.args["lambda_noobj"],
             self.args["use_cuda"],
-            self.args["output_path"]
+            self.args["model_load_path"] if self.args["load_model"] else None,
+            self.args["clip_max_norm"] if self.args["clip_grad"] else None,
+            self.args["score_threshold"],
+            self.args["iou_threshold"]
         )
 
     def run(self):
-        if not os.path.exists(self.args["output_path"]):
-            os.makedirs(self.args["output_path"])
-        for epoch in range(self.args["epochs"]):
+        self.model.save_log(self.args["log_save_dir"])
+        for epoch in range(self.args["num_epochs"]):
             if not self.args["not_train"]:
                 """Train"""
                 print('-' * 20 + 'Training epoch %d' % epoch + '-' * 20, flush=True)
@@ -57,8 +84,15 @@ class Classifier:
                         desc='Training batch: '
                 ):
                     self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
-                if self.args["save"]:
-                    self.model.save(os.path.join(self.args["output_path"], str(epoch) + ".pd"))
+
+                    for image in [data[0] for data in self.data_train[start:start + self.args["train_batch_size"]]]:
+                        pred_objects = self.model.predict([image])[0]
+                        # print(pred_objects)
+                        if len(pred_objects) != 0:
+                            show_objects(image, pred_objects, color_dict)
+
+                if self.args["save_model"]:
+                    self.model.save(os.path.join(self.args["model_save_dir"], str(epoch) + ".pd"))
 
             continue
             if not self.args["not_eval"]:
@@ -102,18 +136,21 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
-    parser.add_argument('--output_path', type=str, default='../output/test/',
-                        help='Output path.')
+    parser.add_argument('--load_model', action='store_true', default=False,
+                        help="Whether to load the model from specific directory.")
+    parser.add_argument('--model_load_path', type=str, default='../models/0.pd',
+                        help='Input path for models.')
+
+    parser.add_argument('--log_save_dir', type=str, default='../log',
+                        help='Output directory for logs.')
     parser.add_argument('--use_cuda', action='store_true', default=False,
                         help="Whether to use cuda to run the model.")
-
+    """Arguments for training"""
     parser.add_argument('--not_train', action='store_true', default=False,
                         help="Whether not to train the model.")
-    parser.add_argument('--save', action='store_true', default=False,
-                        help="Whether to save the model after training.")
-    parser.add_argument('--train_batch_size', type=int, default=32,
+    parser.add_argument('--train_batch_size', type=int, default=2,
                         help='Batch size of train set.')
-    parser.add_argument('--epochs', type=int, default=20,
+    parser.add_argument('--num_epochs', type=int, default=200,
                         help='Number of epochs.')
     parser.add_argument('--lr', type=float, default=0.0005,
                         help='Learning rate.')
@@ -123,18 +160,29 @@ def parse_args():
                         help='Lambda of coordinates.')
     parser.add_argument('--lambda_noobj', type=float, default=5,
                         help='Lambda with no objects.')
-
+    parser.add_argument('--clip_grad', action='store_true', default=False,
+                        help="Whether to clip gradients.")
+    parser.add_argument('--clip_max_norm', type=float, default=1000,
+                        help='Max norm of the gradients.')
+    parser.add_argument('--save_model', action='store_true', default=False,
+                        help="Whether to save the model after training.")
+    parser.add_argument('--model_save_dir', type=str, default='../output/test/',
+                        help='Output directory for the model.')
+    """Arguments for evaluation"""
     parser.add_argument('--not_eval', action='store_true', default=False,
                         help="Whether not to evaluate the model.")
-    parser.add_argument('--dev_batch_size', type=int, default=32,
+    parser.add_argument('--dev_batch_size', type=int, default=2,
                         help='Batch size of dev set.')
-
+    parser.add_argument('--score_threshold', type=float, default=0.5,
+                        help='Threshold of score(IOU * P(Object)).')
+    parser.add_argument('--iou_threshold', type=float, default=0.5,
+                        help='Threshold of IOU.')
+    """Arguments for test"""
     parser.add_argument('--not_test', action='store_true', default=False,
                         help="Whether not to test the model.")
-    parser.add_argument('--test_batch_size', type=int, default=32,
+    parser.add_argument('--test_batch_size', type=int, default=2,
                         help='Batch size of test set.')
-    args = parser.parse_args()
-    return args.__dict__
+    return parser.parse_args().__dict__
 
 
 if __name__ == '__main__':
