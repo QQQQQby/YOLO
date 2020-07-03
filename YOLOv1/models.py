@@ -31,6 +31,7 @@ class YOLOv1:
 
         self.device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
         self.backbone = YOLOv1TinyBackbone() if model_path is None else torch.load(model_path)
+        # self.backbone = YOLOv1Backbone() if model_path is None else torch.load(model_path)
         self.backbone = self.backbone.to(self.device)
 
         self.optimizer = optim.SGD(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
@@ -127,7 +128,6 @@ class YOLOv1:
 
     @torch.no_grad()
     def predict(self, images):
-        # batch: [[image, object_info_dict] * batch_size]
         self.backbone.eval()
         output_dict = self.get_output_dict(images)
         results = []
@@ -156,14 +156,14 @@ class YOLOv1:
                                     float((output_dict[w_label][image_id, row, col]).detach() * 448),
                                     float((output_dict[h_label][image_id, row, col]).detach() * 448)
                                 ])
-                candidates.sort(key=lambda x: -x[2])  # 将所有bounding box按分数从高到低排列
+                candidates.sort(key=lambda x: -x[2])  # 将所有候选bounding box按分数从高到低排列
                 for c_i in range(len(candidates) - 1):
-                    if candidates[c_i][2] != 0:
+                    if candidates[c_i][2] > 0:
                         for c_j in range(c_i + 1, len(candidates)):
                             if iou(candidates[c_i][3:], candidates[c_j][3:], 448, 448) > self.iou_threshold:
-                                candidates[c_j][2] = 0
+                                candidates[c_j][2] = -1
                 for c_i in range(len(candidates)):
-                    if candidates[c_i][2] != 0:
+                    if candidates[c_i][2] > 0:
                         results[-1].append({
                             "x": candidates[c_i][3],
                             "y": candidates[c_i][4],

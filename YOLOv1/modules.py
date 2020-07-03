@@ -61,36 +61,36 @@ class YOLOv1Backbone(nn.Module):
         """3 * 448 * 448"""
         x = self.conv1(x)
         x = self.batch_norm1(x)
-        x = F.leaky_relu(x, 0.1)
+        x = F.leaky_relu(x, 0.1, inplace=True)
         x = self.pool1(x)
         """64 * 112 * 112"""
         x = self.conv2(x)
         x = self.batch_norm2(x)
-        x = F.leaky_relu(x, 0.1)
+        x = F.leaky_relu(x, 0.1, inplace=True)
         x = self.pool2(x)
         """192 * 56 * 56"""
         for i in range(3, 7):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1)
+            x = F.leaky_relu(x, 0.1, inplace=True)
         x = self.pool3(x)
         """512 * 28 * 28"""
         for i in range(7, 17):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1)
+            x = F.leaky_relu(x, 0.1, inplace=True)
         x = self.pool4(x)
         """1024 * 14 * 14"""
         for i in range(17, 25):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1)
+            x = F.leaky_relu(x, 0.1, inplace=True)
         """1024 * 7 * 7"""
         x = x.view(-1, 1024 * 7 * 7)
         """50176"""
         x = self.fc1(x)
         x = self.dropout(x)
-        x = F.leaky_relu(x, 0.1)
+        x = F.leaky_relu(x, 0.1, inplace=True)
         """4096"""
         x = self.fc2(x)
         """1470"""
@@ -141,18 +141,18 @@ class YOLOv1TinyBackbone(nn.Module):
         for i in range(1, 7):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1)
+            x = F.leaky_relu(x, 0.1, inplace=True)
             x = getattr(self, 'pool%d' % i)(x)
         """512 * 28 * 28"""
         for i in range(7, 9):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1)
+            x = F.leaky_relu(x, 0.1, inplace=True)
         """256 * 7 * 7"""
         x = x.view(-1, 256 * 7 * 7)
         """25088"""
         x = self.fc1(x)
-        x = F.leaky_relu(x, 0.1)
+        x = F.leaky_relu(x, 0.1, inplace=True)
         """1470"""
         x = x.view(-1, 7, 7, 30)
         """30 * 7 * 7"""

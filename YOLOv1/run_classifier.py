@@ -85,16 +85,9 @@ class Classifier:
                 ):
                     self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
 
-                    for image in [data[0] for data in self.data_train[start:start + self.args["train_batch_size"]]]:
-                        pred_objects = self.model.predict([image])[0]
-                        # print(pred_objects)
-                        if len(pred_objects) != 0:
-                            show_objects(image, pred_objects, color_dict)
-
                 if self.args["save_model"]:
                     self.model.save(os.path.join(self.args["model_save_dir"], str(epoch) + ".pd"))
 
-            continue
             if not self.args["not_eval"]:
                 """Eval"""
                 print('-' * 20 + 'Evaluating epoch %d' % epoch + '-' * 20, flush=True)
@@ -103,15 +96,17 @@ class Classifier:
                         range(0, len(self.data_dev), self.args["dev_batch_size"]),
                         desc='Evaluating batch: '
                 ):
-                    images = [d[0] for d in self.data_dev[start:start + self.args["dev_batch_size"]]]
-                    actual_labels = [d[1] for d in self.data_dev[start:start + self.args["dev_batch_size"]]]
-                    """forward"""
-                    batch_images = torch.tensor(images, dtype=torch.float32)
-                    outputs = self.model(batch_images)
+                    """forward and show image"""
+                    for image in [data[0] for data in self.data_dev[start:start + self.args["dev_batch_size"]]]:
+                        pred_objects = self.model.predict([image])[0]
+                        # print(pred_objects)
+                        if len(pred_objects) != 0:
+                            show_objects(image, pred_objects, color_dict)
                     """update confusion matrix"""
+
                 """evaluate"""
 
-            if not self.args.not_test:
+            if not self.args["not_test"]:
                 pass
                 # """Test"""
                 # print('-' * 20 + 'Testing epoch %d' % epoch + '-' * 20, flush=True)
@@ -148,7 +143,7 @@ def parse_args():
     """Arguments for training"""
     parser.add_argument('--not_train', action='store_true', default=False,
                         help="Whether not to train the model.")
-    parser.add_argument('--train_batch_size', type=int, default=2,
+    parser.add_argument('--train_batch_size', type=int, default=32,
                         help='Batch size of train set.')
     parser.add_argument('--num_epochs', type=int, default=200,
                         help='Number of epochs.')
@@ -171,9 +166,9 @@ def parse_args():
     """Arguments for evaluation"""
     parser.add_argument('--not_eval', action='store_true', default=False,
                         help="Whether not to evaluate the model.")
-    parser.add_argument('--dev_batch_size', type=int, default=2,
+    parser.add_argument('--dev_batch_size', type=int, default=8,
                         help='Batch size of dev set.')
-    parser.add_argument('--score_threshold', type=float, default=0.5,
+    parser.add_argument('--score_threshold', type=float, default=0.8,
                         help='Threshold of score(IOU * P(Object)).')
     parser.add_argument('--iou_threshold', type=float, default=0.5,
                         help='Threshold of IOU.')
