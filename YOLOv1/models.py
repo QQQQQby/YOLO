@@ -1,6 +1,5 @@
 # coding: utf-8
 
-from YOLOv1.modules import YOLOv1Backbone, YOLOv1TinyBackbone
 from util.functions import iou
 
 import torch
@@ -12,27 +11,25 @@ import numpy as np
 class YOLOv1:
     def __init__(
             self,
+            backbone,
+            device,
             labels,
             lr,
             momentum,
             lambda_coord,
             lambda_noobj,
-            use_cuda,
-            model_path=None,
             clip_max_norm=None,
             score_threshold=0.5,
-            iou_threshold=0.5
+            iou_threshold_pred=0.5,
+            iou_thresholds_mmAP=None
     ):
+        self.backbone = backbone
+        self.device = device
         self.labels = labels
         self.lr = lr
         self.momentum = momentum
         self.lambda_coord = lambda_coord
         self.lambda_noobj = lambda_noobj
-
-        self.device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
-        self.backbone = YOLOv1TinyBackbone() if model_path is None else torch.load(model_path)
-        # self.backbone = YOLOv1Backbone() if model_path is None else torch.load(model_path)
-        self.backbone = self.backbone.to(self.device)
 
         self.optimizer = optim.SGD(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
         # self.optimizer = optim.Adam(self.backbone.parameters(), lr=self.lr)
@@ -40,13 +37,13 @@ class YOLOv1:
 
         self.clip_max_norm = clip_max_norm
         self.score_threshold = score_threshold
-        self.iou_threshold = iou_threshold
+        self.iou_threshold_pred = iou_threshold_pred
+        if iou_thresholds_mmAP is None:
+            self.iou_thresholds_mmAP = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+        else:
+            self.iou_thresholds_mmAP = iou_thresholds_mmAP
 
     def train(self, batch):
-
-        self.predict([data[0] for data in batch])
-
-        self.backbone.train()
         self.optimizer.zero_grad()
         loss = self.get_loss(batch)
         loss.backward()
@@ -126,12 +123,11 @@ class YOLOv1:
                             loss += self.lambda_noobj * (output_dict[c_label][data_id, i, j] - 0) ** 2
         return loss
 
-    @torch.no_grad()
     def predict(self, images):
-        self.backbone.eval()
-        output_dict = self.get_output_dict(images)
+        with torch.no_grad():
+            output_dict = self.get_output_dict(images)
         results = []
-        for image_id, image in enumerate(images):
+        for image_id in range(len(images)):
             results.append([])
             """使用NMS算法选择检测的目标"""
             for category in self.labels:
@@ -160,7 +156,7 @@ class YOLOv1:
                 for c_i in range(len(candidates) - 1):
                     if candidates[c_i][2] > 0:
                         for c_j in range(c_i + 1, len(candidates)):
-                            if iou(candidates[c_i][3:], candidates[c_j][3:], 448, 448) > self.iou_threshold:
+                            if iou(candidates[c_i][3:], candidates[c_j][3:], 448, 448) > self.iou_threshold_pred:
                                 candidates[c_j][2] = -1
                 for c_i in range(len(candidates)):
                     if candidates[c_i][2] > 0:
@@ -174,11 +170,18 @@ class YOLOv1:
         # print(results)
         return results
 
+    # def get_mmAP(self, batch):
+    #     output_dict = self.get_output_dict([data[0] for data in batch])
+    #     results = []
+    #     for data_id in range(len(batch)):
+
+
+
     def get_output_dict(self, images):
         output_tensor = self.backbone(torch.from_numpy(np.array(images)).
                                       to(self.device))  # batch_size, 7, 7, 30
         output_dict = {"probs": output_tensor[:, :, :, :20]}
-        names = ['c0', 'c1', 'x0', 'y0', 'w0', 'h0', 'x1', 'y1', 'w1', 'h1']
+        names = ['c0', 'x0', 'y0', 'w0', 'h0', 'c1', 'x1', 'y1', 'w1', 'h1']
         for i, name in enumerate(names):
             output_dict[name] = torch.sigmoid(output_tensor[:, :, :, 20 + i])
         return output_dict
