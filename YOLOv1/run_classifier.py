@@ -97,6 +97,7 @@ class Classifier:
                         range(0, len(self.data_train), self.args["train_batch_size"]),
                         desc='Training batch: '
                 ):
+                    self.model.get_mmAP(self.data_train[start:start + self.args["train_batch_size"]])
                     self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
                 """Save current model"""
                 if self.args["save_model"]:
@@ -145,6 +146,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
+    parser.add_argument('--model_type', type=str, default='tiny-YOLOv1',
+                        help='Model type. optional models: YOLOv1, tiny-YOLOv1.')
     parser.add_argument('--load_model', action='store_true', default=False,
                         help="Whether to load the model from specific directory.")
     parser.add_argument('--model_load_path', type=str, default='../models/0.pd',
@@ -182,9 +185,9 @@ def parse_args():
                         help="Whether not to evaluate the model.")
     parser.add_argument('--dev_batch_size', type=int, default=2,
                         help='Batch size of dev set.')
-    parser.add_argument('--score_threshold', type=float, default=0.8,
+    parser.add_argument('--score_threshold', type=float, default=0.2,
                         help='Threshold of score(IOU * P(Object)).')
-    parser.add_argument('--iou_thresholds_pred', type=float, default=0.5,
+    parser.add_argument('--iou_threshold_pred', type=float, default=0.5,
                         help='Threshold of IOU used for calculation of NMS.')
     parser.add_argument('--iou_thresholds_mmAP', type=list,
                         default=[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95],

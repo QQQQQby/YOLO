@@ -1,6 +1,7 @@
 # coding: utf-8
 
 from util.functions import iou
+from util.metrics import get_precision_and_recall, get_AP
 
 import torch
 from torch import nn, optim
@@ -20,7 +21,7 @@ class YOLOv1:
             lambda_noobj,
             clip_max_norm=None,
             score_threshold=0.5,
-            iou_threshold_pred=0.5,
+            iou_threshold_pred=0.2,
             iou_thresholds_mmAP=None
     ):
         self.backbone = backbone
@@ -76,10 +77,10 @@ class YOLOv1:
                     pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col] * 448
                     pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col] * 448
                     """计算gt与dt的IOU"""
-                    ious.append(iou((float(pred_coord_dict[x_label]),
-                                     float(pred_coord_dict[y_label]),
-                                     float(pred_coord_dict[w_label]),
-                                     float(pred_coord_dict[h_label])),
+                    ious.append(iou((int(pred_coord_dict[x_label]),
+                                     int(pred_coord_dict[y_label]),
+                                     int(pred_coord_dict[w_label]),
+                                     int(pred_coord_dict[h_label])),
                                     (true_dict['x'],
                                      true_dict['y'],
                                      true_dict['w'],
@@ -156,7 +157,8 @@ class YOLOv1:
                 for c_i in range(len(candidates) - 1):
                     if candidates[c_i][2] > 0:
                         for c_j in range(c_i + 1, len(candidates)):
-                            if iou(candidates[c_i][3:], candidates[c_j][3:], 448, 448) > self.iou_threshold_pred:
+                            if iou(tuple(candidates[c_i][3:]), tuple(candidates[c_j][3:]), 448, 448) \
+                                    > self.iou_threshold_pred:
                                 candidates[c_j][2] = -1
                 for c_i in range(len(candidates)):
                     if candidates[c_i][2] > 0:
@@ -165,17 +167,43 @@ class YOLOv1:
                             "y": candidates[c_i][4],
                             "w": candidates[c_i][5],
                             "h": candidates[c_i][6],
-                            "name": category
+                            "name": category,
+                            "score": candidates[c_i][2]
                         })
         # print(results)
         return results
 
-    # def get_mmAP(self, batch):
-    #     output_dict = self.get_output_dict([data[0] for data in batch])
-    #     results = []
-    #     for data_id in range(len(batch)):
+    def get_mmAP(self, batch):
+        pred_results = self.predict([data[0] for data in batch])
+        results = []
+        for data_id in range(len(batch)):
+            dt_list = pred_results[data_id]
+            dt_dict = {}
+            for category in self.labels:
+                dt_dict[category] = []
+            for dt in dt_list:
+                dt_dict[dt["name"]].append(dt)
 
+            gt_list = batch[data_id][1]
+            gt_dict = {}
+            for category in self.labels:
+                gt_dict[category] = []
+            for gt in gt_list:
+                gt_dict[gt["name"]].append(gt)
 
+            for iou_threshold in self.iou_thresholds_mmAP:
+                for category in self.labels:
+                    """"""
+                    dts = dt_dict[category]
+                    gts = gt_dict[category]
+                    dts.sort(key=lambda x: -x["score"])  # 将所有的dt按分数从高到低排序
+                    precisions = []
+                    recalls = []
+                    for n in range(1, len(dts)):
+                        p, r = get_precision_and_recall(dts[:n], gts, iou_threshold)
+                        precisions.append(p)
+                        recalls.append(r)
+                    AP = get_AP(precisions, recalls)
 
     def get_output_dict(self, images):
         output_tensor = self.backbone(torch.from_numpy(np.array(images)).
