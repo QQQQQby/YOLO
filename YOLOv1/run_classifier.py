@@ -58,10 +58,10 @@ class Classifier:
         else:
             self.device = torch.device("cpu")
         if self.args["load_model"]:
-            self.backbone = torch.load(self.args["model_path"])
+            self.backbone = torch.load(self.args["model_load_path"])
         elif self.args["model_type"] == "YOLOv1":
             self.backbone = YOLOv1Backbone()
-        elif self.args["model_type"] == "tiny-YOLOv1":
+        elif self.args["model_type"] == "Tiny-YOLOv1":
             self.backbone = TinyYOLOv1Backbone()
         self.backbone = self.backbone.to(self.device)
 
@@ -97,11 +97,14 @@ class Classifier:
                         range(0, len(self.data_train), self.args["train_batch_size"]),
                         desc='Training batch: '
                 ):
-                    self.model.get_mmAP(self.data_train[start:start + self.args["train_batch_size"]])
-                    self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
+                    loss = self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
+                    print(loss)
                 """Save current model"""
                 if self.args["save_model"]:
-                    self.model.save(os.path.join(self.args["model_save_dir"], str(epoch) + ".pd"))
+                    self.model.save(os.path.join(
+                        self.args["model_save_dir"],
+                        time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()) + "_" + str(epoch) + ".pd"
+                    ))
 
             if not self.args["not_eval"]:
                 """Evaluate"""
@@ -112,7 +115,7 @@ class Classifier:
                         range(0, len(self.data_dev), self.args["dev_batch_size"]),
                         desc='Evaluating batch: '
                 ):
-                    pass
+                    self.model.get_mmAP(self.data_train[start:start + self.args["train_batch_size"]])
                     # """forward and show image"""
                     # for image in [data[0] for data in self.data_dev[start:start + self.args["dev_batch_size"]]]:
                     #     pred_objects = self.model.predict([image])[0]
@@ -146,11 +149,11 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
-    parser.add_argument('--model_type', type=str, default='tiny-YOLOv1',
-                        help='Model type. optional models: YOLOv1, tiny-YOLOv1.')
+    parser.add_argument('--model_type', type=str, default='Tiny-YOLOv1',
+                        help='Model type. optional models: YOLOv1, Tiny-YOLOv1.')
     parser.add_argument('--load_model', action='store_true', default=False,
                         help="Whether to load the model from specific directory.")
-    parser.add_argument('--model_load_path', type=str, default='../models/0.pd',
+    parser.add_argument('--model_load_path', type=str, default='../output/test/47.pd',
                         help='Input path for models.')
 
     parser.add_argument('--log_save_dir', type=str, default='../log',
@@ -160,7 +163,7 @@ def parse_args():
     """Arguments for training"""
     parser.add_argument('--not_train', action='store_true', default=False,
                         help="Whether not to train the model.")
-    parser.add_argument('--train_batch_size', type=int, default=32,
+    parser.add_argument('--train_batch_size', type=int, default=64,
                         help='Batch size of train set.')
     parser.add_argument('--num_epochs', type=int, default=200,
                         help='Number of epochs.')
@@ -178,14 +181,14 @@ def parse_args():
                         help='Max norm of the gradients.')
     parser.add_argument('--save_model', action='store_true', default=False,
                         help="Whether to save the model after training.")
-    parser.add_argument('--model_save_dir', type=str, default='../output/test/',
+    parser.add_argument('--model_save_dir', type=str, default='../models/',
                         help='Output directory for the model.')
     """Arguments for evaluation"""
     parser.add_argument('--not_eval', action='store_true', default=False,
                         help="Whether not to evaluate the model.")
-    parser.add_argument('--dev_batch_size', type=int, default=2,
+    parser.add_argument('--dev_batch_size', type=int, default=32,
                         help='Batch size of dev set.')
-    parser.add_argument('--score_threshold', type=float, default=0.2,
+    parser.add_argument('--score_threshold', type=float, default=0.5,
                         help='Threshold of score(IOU * P(Object)).')
     parser.add_argument('--iou_threshold_pred', type=float, default=0.5,
                         help='Threshold of IOU used for calculation of NMS.')
@@ -195,7 +198,7 @@ def parse_args():
     """Arguments for test"""
     parser.add_argument('--not_test', action='store_true', default=False,
                         help="Whether not to test the model.")
-    parser.add_argument('--test_batch_size', type=int, default=2,
+    parser.add_argument('--test_batch_size', type=int, default=32,
                         help='Batch size of test set.')
     return parser.parse_args().__dict__
 

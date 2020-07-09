@@ -142,7 +142,8 @@ class YOLOv1:
                             h_label = "h" + str(bbox_id)
                             c_label = "c" + str(bbox_id)
                             score = (output_dict[c_label][image_id, row, col] *
-                                     output_dict["probs"][image_id, row, col, self.labels.index(category)]).detach()
+                                     output_dict["probs"][image_id, row, col, self.labels.index(category)]).detach().cpu().numpy()
+                            print("score = "+str(score))
                             if score >= self.score_threshold:
                                 candidates.append([
                                     row,
@@ -161,6 +162,7 @@ class YOLOv1:
                                     > self.iou_threshold_pred:
                                 candidates[c_j][2] = -1
                 for c_i in range(len(candidates)):
+                    # print(candidates[c_i])
                     if candidates[c_i][2] > 0:
                         results[-1].append({
                             "x": candidates[c_i][3],
@@ -208,7 +210,7 @@ class YOLOv1:
     def get_output_dict(self, images):
         output_tensor = self.backbone(torch.from_numpy(np.array(images)).
                                       to(self.device))  # batch_size, 7, 7, 30
-        output_dict = {"probs": output_tensor[:, :, :, :20]}
+        output_dict = {"probs": torch.softmax(output_tensor[:, :, :, :20], -1)}
         names = ['c0', 'x0', 'y0', 'w0', 'h0', 'c1', 'x1', 'y1', 'w1', 'h1']
         for i, name in enumerate(names):
             output_dict[name] = torch.sigmoid(output_tensor[:, :, :, 20 + i])
