@@ -43,7 +43,7 @@ class VOC2012Loader(DataLoader):
         file_names = os.listdir(os.path.join(self.get_path(), "VOC2012", "train", "JPEGImages"))
         file_names = [name.replace('.jpg', '') for name in file_names]
 
-        file_names = file_names[:200]
+        file_names = file_names[:2000]
 
         split_index = int(train_prop * len(file_names))
         self.train_file_names = file_names[:split_index]

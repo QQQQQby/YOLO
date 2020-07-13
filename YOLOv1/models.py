@@ -74,8 +74,8 @@ class YOLOv1:
                     """计算预测的坐标"""
                     pred_coord_dict[x_label] = (output_dict[x_label][data_id, row, col] + col) * (448 / 7 - 1)
                     pred_coord_dict[y_label] = (output_dict[y_label][data_id, row, col] + row) * (448 / 7 - 1)
-                    pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col] * 448
-                    pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col] * 448
+                    pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col]
+                    pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col]
                     """计算gt与dt的IOU"""
                     ious.append(iou((int(pred_coord_dict[x_label]),
                                      int(pred_coord_dict[y_label]),
@@ -84,8 +84,8 @@ class YOLOv1:
                                     (true_dict['x'],
                                      true_dict['y'],
                                      true_dict['w'],
-                                     true_dict['h']),
-                                    448, 448))
+                                     true_dict['h']))
+                                )
                 # print(pred_coord_dict, row, col)
                 """取IOU较大的bounding box进行坐标损失和置信度损失的计算"""
                 chosen_bbox_id = np.argmax(ious)
@@ -98,6 +98,11 @@ class YOLOv1:
                                              (pred_coord_dict[y_label] - true_dict['y']) ** 2 +
                                              (pred_coord_dict[w_label] ** 0.5 - true_dict['w'] ** 0.5) ** 2 +
                                              (pred_coord_dict[h_label] ** 0.5 - true_dict['h'] ** 0.5) ** 2)
+                # print("Coordinate loss =",
+                #       self.lambda_coord * ((pred_coord_dict[x_label] - true_dict['x']) ** 2 +
+                #                            (pred_coord_dict[y_label] - true_dict['y']) ** 2 +
+                #                            (pred_coord_dict[w_label] ** 0.5 - true_dict['w'] ** 0.5) ** 2 +
+                #                            (pred_coord_dict[h_label] ** 0.5 - true_dict['h'] ** 0.5) ** 2))
                 loss += (output_dict[c_label][data_id, row, col] - 1) ** 2
                 """未被选中的(即IOU较小的)bounding box，取其置信度为0进行损失计算"""
                 for bbox_id in range(2):
@@ -109,6 +114,7 @@ class YOLOv1:
                 prob_loss = nn.MSELoss(reduction="sum")
                 true_porbs = torch.zeros((20,))
                 true_porbs[self.labels.index(true_dict['name'])] = 1
+                # print("Prob loss =", prob_loss(output_dict['probs'][data_id, row, col], true_porbs))
                 loss += prob_loss(
                     output_dict['probs'][data_id, row, col],
                     true_porbs
@@ -142,36 +148,39 @@ class YOLOv1:
                             h_label = "h" + str(bbox_id)
                             c_label = "c" + str(bbox_id)
                             score = (output_dict[c_label][image_id, row, col] *
-                                     output_dict["probs"][image_id, row, col, self.labels.index(category)]).detach().cpu().numpy()
+                                     output_dict["probs"][
+                                         image_id, row, col, self.labels.index(category)]).detach().cpu().numpy()
                             print("score = "+str(score))
                             if score >= self.score_threshold:
-                                candidates.append([
-                                    row,
-                                    col,
-                                    score,
-                                    float((output_dict[x_label][image_id, row, col] + col).detach() * (448 / 7 - 1)),
-                                    float((output_dict[y_label][image_id, row, col] + row).detach() * (448 / 7 - 1)),
-                                    float((output_dict[w_label][image_id, row, col]).detach() * 448),
-                                    float((output_dict[h_label][image_id, row, col]).detach() * 448)
-                                ])
-                candidates.sort(key=lambda x: -x[2])  # 将所有候选bounding box按分数从高到低排列
+                                candidates.append({
+                                    "score": score,
+                                    "x": float(
+                                        (output_dict[x_label][image_id, row, col] + col).detach() * (448 / 7 - 1)),
+                                    "y": float(
+                                        (output_dict[y_label][image_id, row, col] + row).detach() * (448 / 7 - 1)),
+                                    "w": float((output_dict[w_label][image_id, row, col]).detach()),
+                                    "h": float((output_dict[h_label][image_id, row, col]).detach())
+                                })
+                candidates.sort(key=lambda x: -x["score"])  # 将所有候选bounding box按分数从高到低排列
                 for c_i in range(len(candidates) - 1):
-                    if candidates[c_i][2] > 0:
+                    if candidates[c_i]["score"] > 0:
                         for c_j in range(c_i + 1, len(candidates)):
-                            if iou(tuple(candidates[c_i][3:]), tuple(candidates[c_j][3:]), 448, 448) \
-                                    > self.iou_threshold_pred:
-                                candidates[c_j][2] = -1
+                            if iou(
+                                    (candidates[c_i]["x"],
+                                     candidates[c_i]["y"],
+                                     candidates[c_i]["w"],
+                                     candidates[c_i]["h"]),
+                                    (candidates[c_j]["x"],
+                                     candidates[c_j]["y"],
+                                     candidates[c_j]["w"],
+                                     candidates[c_j]["h"])
+                            ) > self.iou_threshold_pred:
+                                candidates[c_j]["score"] = -1
                 for c_i in range(len(candidates)):
                     # print(candidates[c_i])
-                    if candidates[c_i][2] > 0:
-                        results[-1].append({
-                            "x": candidates[c_i][3],
-                            "y": candidates[c_i][4],
-                            "w": candidates[c_i][5],
-                            "h": candidates[c_i][6],
-                            "name": category,
-                            "score": candidates[c_i][2]
-                        })
+                    if candidates[c_i]["score"] > 0:
+                        candidates[c_i]["name"] = category
+                        results[-1].append(candidates[c_i])
         # print(results)
         return results
 
@@ -212,8 +221,12 @@ class YOLOv1:
                                       to(self.device))  # batch_size, 7, 7, 30
         output_dict = {"probs": torch.softmax(output_tensor[:, :, :, :20], -1)}
         names = ['c0', 'x0', 'y0', 'w0', 'h0', 'c1', 'x1', 'y1', 'w1', 'h1']
+        activations = ["sigmoid", "sigmoid", "sigmoid", "abs", "abs", "sigmoid", "sigmoid", "sigmoid", "abs", "abs"]
         for i, name in enumerate(names):
-            output_dict[name] = torch.sigmoid(output_tensor[:, :, :, 20 + i])
+            if activations[i] == "sigmoid":
+                output_dict[name] = torch.sigmoid(output_tensor[:, :, :, 20 + i])
+            elif activations[i] == "abs":
+                output_dict[name] = torch.abs(output_tensor[:, :, :, 20 + i])
         return output_dict
 
     def save(self, model_save_path):

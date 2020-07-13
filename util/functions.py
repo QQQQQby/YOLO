@@ -5,7 +5,7 @@ import numpy as np
 from typing import List, Tuple, Dict
 
 
-def iou(bbox0: Tuple[int, int, int, int], bbox1: Tuple[int, int, int, int], max_width: int, max_height: int) -> float:
+def iou(bbox0: Tuple[int, int, int, int], bbox1: Tuple[int, int, int, int]) -> float:
     x0, y0, w0, h0 = bbox0[:4]
     x1, y1, w1, h1 = bbox1[:4]
     upper_left0 = (round(x0 - w0 / 2), round(y0 - h0 / 2))
@@ -23,7 +23,7 @@ def iou(bbox0: Tuple[int, int, int, int], bbox1: Tuple[int, int, int, int], max_
 def show_objects(image_array: np.ndarray, objects, color_dict):
     image = draw_image(image_array, objects, color_dict)
     cv2.imshow('Object Detection', image)
-    cv2.waitKey(750)
+    cv2.waitKey(2000)
 
 
 def draw_image(image_array: np.ndarray, objects, color_dict):

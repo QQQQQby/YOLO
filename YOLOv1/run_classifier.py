@@ -97,7 +97,8 @@ class Classifier:
                         range(0, len(self.data_train), self.args["train_batch_size"]),
                         desc='Training batch: '
                 ):
-                    loss = self.model.train(self.data_train[start:start + self.args["train_batch_size"]])
+                    end = min(start + self.args["train_batch_size"], len(self.data_train))
+                    loss = self.model.train(self.data_train[start:end])
                     print(loss)
                 """Save current model"""
                 if self.args["save_model"]:
@@ -115,7 +116,16 @@ class Classifier:
                         range(0, len(self.data_dev), self.args["dev_batch_size"]),
                         desc='Evaluating batch: '
                 ):
-                    self.model.get_mmAP(self.data_train[start:start + self.args["train_batch_size"]])
+                    end = min(start + self.args["dev_batch_size"], len(self.data_dev))
+                    # self.model.get_mmAP(self.data_dev[start:end])
+                    #
+                    objects = self.model.predict([data[0] for data in self.data_dev[start:end]])
+                    for i in range(start, end):
+                        show_objects(self.data_dev[i][0], self.data_dev[i][1], color_dict)
+                        show_objects(self.data_dev[i][0], objects[i-start], color_dict)
+
+
+                    
                     # """forward and show image"""
                     # for image in [data[0] for data in self.data_dev[start:start + self.args["dev_batch_size"]]]:
                     #     pred_objects = self.model.predict([image])[0]
@@ -153,7 +163,7 @@ def parse_args():
                         help='Model type. optional models: YOLOv1, Tiny-YOLOv1.')
     parser.add_argument('--load_model', action='store_true', default=False,
                         help="Whether to load the model from specific directory.")
-    parser.add_argument('--model_load_path', type=str, default='../output/test/47.pd',
+    parser.add_argument('--model_load_path', type=str, default='../models/2020-07-11_15-21-31_199.pd',
                         help='Input path for models.')
 
     parser.add_argument('--log_save_dir', type=str, default='../log',
@@ -173,7 +183,7 @@ def parse_args():
                         help='Momentum of optimizer.')
     parser.add_argument('--lambda_coord', type=float, default=5,
                         help='Lambda of coordinates.')
-    parser.add_argument('--lambda_noobj', type=float, default=5,
+    parser.add_argument('--lambda_noobj', type=float, default=0.5,
                         help='Lambda with no objects.')
     parser.add_argument('--clip_grad', action='store_true', default=False,
                         help="Whether to clip gradients.")
@@ -188,7 +198,7 @@ def parse_args():
                         help="Whether not to evaluate the model.")
     parser.add_argument('--dev_batch_size', type=int, default=32,
                         help='Batch size of dev set.')
-    parser.add_argument('--score_threshold', type=float, default=0.5,
+    parser.add_argument('--score_threshold', type=float, default=0.1,
                         help='Threshold of score(IOU * P(Object)).')
     parser.add_argument('--iou_threshold_pred', type=float, default=0.5,
                         help='Threshold of IOU used for calculation of NMS.')
