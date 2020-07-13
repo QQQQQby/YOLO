@@ -3,11 +3,8 @@
 import os
 from xml.dom import minidom
 import cv2
-import numpy as np
-from PIL import Image
 from tqdm import tqdm
 from multiprocessing import Pool
-from p_tqdm import p_map
 
 
 class DataLoader:
