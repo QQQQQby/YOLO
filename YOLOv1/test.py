@@ -13,38 +13,7 @@ from YOLOv1.modules import YOLOv1Backbone
 from YOLOv1.models import YOLOv1
 from data.loaders import VOC2012Loader
 from util.functions import show_objects
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
-    parser.add_argument('--dataset_path', type=str, default='./data',
-                        help='Dataset path.')
-    parser.add_argument('--output_path', type=str, default='./output/1000_0.01_dropout0.7',
-                        help='Output path.')
-
-    parser.add_argument('--not_train', action='store_true', default=False,
-                        help="Whether not to train the model.")
-    parser.add_argument('--save', action='store_true', default=False,
-                        help="Whether to save the model after training.")
-    parser.add_argument('--train_batch_size', type=int, default=1000,
-                        help='Batch size of train set.')
-    parser.add_argument('--epochs', type=int, default=20,
-                        help='Number of epochs.')
-    parser.add_argument('--lr', type=float, default=0.01,
-                        help='Learning rate.')
-
-    parser.add_argument('--not_eval', action='store_true', default=False,
-                        help="Whether not to evaluate the model.")
-    parser.add_argument('--dev_batch_size', type=int, default=2000,
-                        help='Batch size of dev set.')
-
-    parser.add_argument('--not_test', action='store_true', default=False,
-                        help="Whether not to test the model.")
-    parser.add_argument('--test_batch_size', type=int, default=2000,
-                        help='Batch size of test set.')
-    args = parser.parse_args().__dict__
-    return args
-
+from util.metrics import get_AP
 
 if __name__ == '__main__':
     # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
@@ -63,40 +32,44 @@ if __name__ == '__main__':
     # o = m(d)
     # print(o.shape)
 
-    color_dict = {
-        "person": (255, 0, 0),
-        "bird": (112, 128, 105),
-        "cat": (56, 94, 15),
-        "cow": (8, 46, 84),
-        "dog": (210, 105, 30),
-        "horse": (128, 42, 42),
-        "sheep": (255, 250, 250),
-        "aeroplane": (0, 255, 255),
-        "bicycle": (255, 235, 205),
-        "boat": (210, 180, 140),
-        "bus": (220, 220, 220),
-        "car": (0, 0, 255),
-        "motorbike": (250, 255, 240),
-        "train": (127, 255, 212),
-        "bottle": (51, 161, 201),
-        "chair": (139, 69, 19),
-        "diningtable": (115, 74, 18),
-        "pottedplant": (46, 139, 87),
-        "sofa": (160, 32, 240),
-        "tvmonitor": (65, 105, 225)
-    }
+    p = [1, 0.6, 0.45, 0.4, 0.4, 0, 0, 0, 0, 0]
+    r = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    print(get_AP(p, r))
 
-    loader = VOC2012Loader("G:/DataSets")
-
-    a = loader.get_data_dev()
-
-    for i in range(200):
-        show_objects(a[i][0], a[i][1], color_dict)
-
-    m = YOLOv1(["person",
-                "bird", "cat", "cow", "dog", "horse", "sheep",
-                "aeroplane", "bicycle", "boat", "bus", "car", "motorbike", "train",
-                "bottle", "chair", "diningtable", "pottedplant", "sofa", "tvmonitor"], 5, 5)
-
-    for i in tqdm(range(5)):
-        m.train([a[i]])
+    # color_dict = {
+    #     "person": (255, 0, 0),
+    #     "bird": (112, 128, 105),
+    #     "cat": (56, 94, 15),
+    #     "cow": (8, 46, 84),
+    #     "dog": (210, 105, 30),
+    #     "horse": (128, 42, 42),
+    #     "sheep": (255, 250, 250),
+    #     "aeroplane": (0, 255, 255),
+    #     "bicycle": (255, 235, 205),
+    #     "boat": (210, 180, 140),
+    #     "bus": (220, 220, 220),
+    #     "car": (0, 0, 255),
+    #     "motorbike": (250, 255, 240),
+    #     "train": (127, 255, 212),
+    #     "bottle": (51, 161, 201),
+    #     "chair": (139, 69, 19),
+    #     "diningtable": (115, 74, 18),
+    #     "pottedplant": (46, 139, 87),
+    #     "sofa": (160, 32, 240),
+    #     "tvmonitor": (65, 105, 225)
+    # }
+    #
+    # loader = VOC2012Loader("G:/DataSets")
+    #
+    # a = loader.get_data_dev()
+    #
+    # for i in range(200):
+    #     show_objects(a[i][0], a[i][1], color_dict)
+    #
+    # m = YOLOv1(["person",
+    #             "bird", "cat", "cow", "dog", "horse", "sheep",
+    #             "aeroplane", "bicycle", "boat", "bus", "car", "motorbike", "train",
+    #             "bottle", "chair", "diningtable", "pottedplant", "sofa", "tvmonitor"], 5, 5)
+    #
+    # for i in tqdm(range(5)):
+    #     m.train([a[i]])

@@ -62,8 +62,8 @@ class YOLOv1:
             has_positive = np.zeros((7, 7), np.bool)
             for true_dict in object_info_dicts[data_id]:
                 """获取label对应的栅格所在的行和列"""
-                row = true_dict['y'] // 64
-                col = true_dict['x'] // 64
+                row = int(true_dict['y'] // (448 / 7))  # [0, 6]
+                col = int(true_dict['x'] // (448 / 7))  # [0, 6]
                 ious = []
                 pred_coord_dict = {}
                 for bbox_id in range(2):
@@ -72,20 +72,23 @@ class YOLOv1:
                     w_label = "w" + str(bbox_id)
                     h_label = "h" + str(bbox_id)
                     """计算预测的坐标"""
-                    pred_coord_dict[x_label] = (output_dict[x_label][data_id, row, col] + col) * (448 / 7 - 1)
-                    pred_coord_dict[y_label] = (output_dict[y_label][data_id, row, col] + row) * (448 / 7 - 1)
+                    pred_coord_dict[x_label] = (output_dict[x_label][data_id, row, col] + col) * ((448 - 1) / 7)
+                    # [0, 448 - 1]
+                    pred_coord_dict[y_label] = (output_dict[y_label][data_id, row, col] + row) * ((448 - 1) / 7)
+                    # [0, 448 - 1]
                     pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col]
                     pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col]
                     """计算gt与dt的IOU"""
-                    ious.append(iou((int(pred_coord_dict[x_label]),
-                                     int(pred_coord_dict[y_label]),
-                                     int(pred_coord_dict[w_label]),
-                                     int(pred_coord_dict[h_label])),
-                                    (true_dict['x'],
-                                     true_dict['y'],
-                                     true_dict['w'],
-                                     true_dict['h']))
-                                )
+                    ious.append(iou(
+                        (int(pred_coord_dict[x_label]),
+                         int(pred_coord_dict[y_label]),
+                         int(pred_coord_dict[w_label]),
+                         int(pred_coord_dict[h_label])),
+                        (true_dict['x'],
+                         true_dict['y'],
+                         true_dict['w'],
+                         true_dict['h']))
+                    )
                 # print(pred_coord_dict, row, col)
                 """取IOU较大的bounding box进行坐标损失和置信度损失的计算"""
                 chosen_bbox_id = np.argmax(ious)
@@ -148,16 +151,16 @@ class YOLOv1:
                             h_label = "h" + str(bbox_id)
                             c_label = "c" + str(bbox_id)
                             score = (output_dict[c_label][image_id, row, col] *
-                                     output_dict["probs"][
-                                         image_id, row, col, self.labels.index(category)]).detach().cpu().numpy()
-                            print("score = "+str(score))
+                                     output_dict["probs"][image_id, row, col, self.labels.index(category)])\
+                                .detach().cpu().numpy()
+                            print("score = " + str(score))
                             if score >= self.score_threshold:
                                 candidates.append({
                                     "score": score,
                                     "x": float(
-                                        (output_dict[x_label][image_id, row, col] + col).detach() * (448 / 7 - 1)),
+                                        (output_dict[x_label][image_id, row, col] + col).detach() * ((448 - 1) / 7)),
                                     "y": float(
-                                        (output_dict[y_label][image_id, row, col] + row).detach() * (448 / 7 - 1)),
+                                        (output_dict[y_label][image_id, row, col] + row).detach() * ((448 - 1) / 7)),
                                     "w": float((output_dict[w_label][image_id, row, col]).detach()),
                                     "h": float((output_dict[h_label][image_id, row, col]).detach())
                                 })

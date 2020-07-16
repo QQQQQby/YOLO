@@ -26,7 +26,7 @@ def get_precision_and_recall(dts, gts, iou_threshold):
     for dt in dts:
         if len(gts) == 0:
             break
-        ious = [iou(dt, gt, 448, 448) for gt in gts]
+        ious = [iou(dt, gt) for gt in gts]
         if max(ious) >= iou_threshold:
             tp += 1
             gts.pop(int(np.argmax(ious)))
@@ -36,5 +36,10 @@ def get_precision_and_recall(dts, gts, iou_threshold):
     r = recall(tp, fn)
     return p, r
 
+
 def get_AP(precisions, recalls):
-    pass
+    precisions = precisions.copy() + [0, 1]
+    recalls = recalls.copy() + [1, 0]
+    p_r = list(zip(precisions, recalls))
+    p_r.sort(key=lambda x: -x[0])
+    print(p_r)
