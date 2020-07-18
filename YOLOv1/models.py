@@ -10,45 +10,30 @@ import numpy as np
 
 
 class YOLOv1:
-    def __init__(
-            self,
-            backbone,
-            device,
-            labels,
-            lr,
-            momentum,
-            lambda_coord,
-            lambda_noobj,
-            clip_max_norm=None,
-            score_threshold=0.5,
-            iou_threshold_pred=0.2,
-            iou_thresholds_mmAP=None
-    ):
+    def __init__(self, backbone, device, labels, args):
         self.backbone = backbone
         self.device = device
         self.labels = labels
-        self.lr = lr
-        self.momentum = momentum
-        self.lambda_coord = lambda_coord
-        self.lambda_noobj = lambda_noobj
+
+        self.lr = args["lr"]
+        self.momentum = args["momentum"]
+        self.lambda_coord = args["lambda_coord"]
+        self.lambda_noobj = args["lambda_noobj"]
 
         self.optimizer = optim.SGD(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
         # self.optimizer = optim.Adam(self.backbone.parameters(), lr=self.lr)
         # self.optimizer = optim.(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
 
-        self.clip_max_norm = clip_max_norm
-        self.score_threshold = score_threshold
-        self.iou_threshold_pred = iou_threshold_pred
-        if iou_thresholds_mmAP is None:
-            self.iou_thresholds_mmAP = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
-        else:
-            self.iou_thresholds_mmAP = iou_thresholds_mmAP
+        self.clip_max_norm = args["clip_max_norm"]
+        self.score_threshold = args["score_threshold"]
+        self.iou_threshold = args["iou_threshold"]
+        self.iou_thresholds_mmAP = args["iou_thresholds_mmAP"]
 
     def train(self, batch):
         self.optimizer.zero_grad()
         loss = self.get_loss(batch)
         loss.backward()
-        if self.clip_max_norm is not None:
+        if self.clip_max_norm != 0:
             nn.utils.clip_grad_norm(self.backbone.parameters(), self.clip_max_norm)
         self.optimizer.step()
         return loss
@@ -179,7 +164,7 @@ class YOLOv1:
                                      candidates[c_j]["y"],
                                      candidates[c_j]["w"],
                                      candidates[c_j]["h"])
-                            ) > self.iou_threshold_pred:
+                            ) > self.iou_threshold:
                                 candidates[c_j]["score"] = -1
                 for c_i in range(len(candidates)):
                     # print(candidates[c_i])
@@ -207,7 +192,7 @@ class YOLOv1:
                 gt_dict[gt["name"]].append(gt)
 
             mAPs = []
-            for iou_threshold in self.iou_thresholds_mmAP:
+            for threshold in self.iou_thresholds_mmAP:
                 APs = []
                 for category in self.labels:
                     dts = dt_dict[category]
@@ -216,7 +201,7 @@ class YOLOv1:
                     precisions = []
                     recalls = []
                     for n in range(1, len(dts)):
-                        p, r = get_precision_and_recall(dts[:n], gts, iou_threshold)
+                        p, r = get_precision_and_recall(dts[:n], gts, threshold)
                         precisions.append(p)
                         recalls.append(r)
                     APs.append(get_AP(precisions, recalls))
@@ -245,8 +230,8 @@ class YOLOv1:
             c_label = "c" + str(bbox_id)
             output_dict[x_label] = coords[..., bbox_id, 0]
             output_dict[y_label] = coords[..., bbox_id, 1]
-            output_dict[w_label] = coords[..., bbox_id, 2]**2
-            output_dict[h_label] = coords[..., bbox_id, 3]**2
+            output_dict[w_label] = coords[..., bbox_id, 2] ** 2
+            output_dict[h_label] = coords[..., bbox_id, 3] ** 2
             output_dict[c_label] = confs[..., bbox_id]
         output_dict['probs'] = probs
 
@@ -263,6 +248,6 @@ class YOLOv1:
     def save(self, model_save_path):
         torch.save(self.backbone, model_save_path)
 
-    def save_log(self, log_save_dir):
-        with SummaryWriter(log_dir=log_save_dir) as writer:
+    def save_graph(self, graph_save_dir):
+        with SummaryWriter(log_dir=graph_save_dir) as writer:
             writer.add_graph(self.backbone, [torch.rand(1, 448, 448, 3)])

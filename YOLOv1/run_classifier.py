@@ -31,35 +31,28 @@ class Classifier:
             torch.set_default_tensor_type('torch.cuda.FloatTensor')
         else:
             self.device = torch.device("cpu")
-        if self.args["load_model"]:
+        if self.args["model_load_path"] != "":
             self.backbone = torch.load(self.args["model_load_path"])
-        elif self.args["model_type"] == "YOLOv1":
+        elif self.args["model_type"] in ["", "YOLOv1"]:
             self.backbone = YOLOv1Backbone()
         elif self.args["model_type"] == "Tiny-YOLOv1":
             self.backbone = TinyYOLOv1Backbone()
         self.backbone = self.backbone.to(self.device)
 
-        if not os.path.exists(self.args["model_save_dir"]):
+        if self.args["model_save_dir"] != "" and not os.path.exists(self.args["model_save_dir"]):
             os.makedirs(self.args["model_save_dir"])
-        if not os.path.exists(self.args["log_save_dir"]):
-            os.makedirs(self.args["log_save_dir"])
+        if self.args["graph_save_dir"] != "" and not os.path.exists(self.args["graph_save_dir"]):
+            os.makedirs(self.args["graph_save_dir"])
 
         self.model = YOLOv1(
             self.backbone,
             self.device,
             self.labels,
-            self.args["lr"],
-            self.args["momentum"],
-            self.args["lambda_coord"],
-            self.args["lambda_noobj"],
-            self.args["clip_max_norm"] if self.args["clip_grad"] else None,
-            self.args["score_threshold"],
-            self.args["iou_threshold_pred"],
-            self.args["iou_thresholds_mmAP"]
+            self.args
         )
 
-        if self.args["single_image"] != "":
-            im = cv2.imread(self.args["single_image"])
+        if self.args["image_detect_path"] != "":
+            im = cv2.imread(self.args["image_detect_path"])
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             im = cv2.resize(im, (448, 448))
             pred_results = self.model.predict([im])
@@ -69,17 +62,17 @@ class Classifier:
 
         print('-' * 20 + 'Reading data' + '-' * 20, flush=True)
 
-        if not self.args["not_train"]:
+        if self.args["do_train"]:
             self.data_train = data_loader.get_data_train()
-        if not self.args["not_eval"]:
+        if self.args["do_eval"]:
             self.data_dev = data_loader.get_data_dev()
-        if not self.args["not_test"]:
+        if self.args["do_test"]:
             self.data_test = data_loader.get_data_test()
 
     def run(self):
-        self.model.save_log(self.args["log_save_dir"])
+        self.model.save_graph(self.args["graph_save_dir"])
         for epoch in range(self.args["num_epochs"]):
-            if not self.args["not_train"]:
+            if self.args["do_train"]:
                 """Train"""
                 print('-' * 20 + 'Training epoch %d' % epoch + '-' * 20, flush=True)
                 time.sleep(0.5)
@@ -93,38 +86,28 @@ class Classifier:
                     loss = self.model.train(self.data_train[start:end])
                     print(loss)
                 """Save current model"""
-                if self.args["save_model"]:
+                if self.args["model_save_dir"] != "":
                     self.model.save(os.path.join(
                         self.args["model_save_dir"],
                         time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()) + "_" + str(epoch) + ".pth"
                     ))
 
-            if not self.args["not_eval"]:
+            if self.args["do_eval"]:
                 """Evaluate"""
                 print('-' * 20 + 'Evaluating epoch %d' % epoch + '-' * 20, flush=True)
                 time.sleep(0.5)
                 self.backbone.eval()
+                pred_results = []
                 for start in tqdm(
                         range(0, len(self.data_dev), self.args["dev_batch_size"]),
                         desc='Evaluating batch: '
                 ):
                     end = min(start + self.args["dev_batch_size"], len(self.data_dev))
-                    # self.model.get_mmAP(self.data_dev[start:end])
-                    #
-                    objects = self.model.predict([data[0] for data in self.data_dev[start:end]])
-                    for i in range(start, end):
-                        show_objects(self.data_dev[i][0], self.data_dev[i][1], self.args["colors"])
-                        show_objects(self.data_dev[i][0], objects[i - start], self.args["colors"])
+                    pred_results += self.model.predict([data[0] for data in self.data_dev[start:end]])
+                mmAP = self.model.get_mmAP(self.data_dev, pred_results)
+                print(mmAP)
 
-                    # """forward and show image"""
-                    # for image in [data[0] for data in self.data_dev[start:start + self.args["dev_batch_size"]]]:
-                    #     pred_objects = self.model.predict([image])[0]
-                    #     # print(pred_objects)
-                    #     if len(pred_objects) != 0:
-                    #         show_objects(image, pred_objects, color_dict)
-                    """Calculate mmAP"""
-
-            if not self.args["not_test"]:
+            if not self.args["do_test"]:
                 pass
                 # """Test"""
                 # print('-' * 20 + 'Testing epoch %d' % epoch + '-' * 20, flush=True)

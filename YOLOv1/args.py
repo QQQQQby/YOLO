@@ -11,11 +11,11 @@ color_dict = {
     "horse": (128, 42, 42),
     "sheep": (255, 0, 250),
     "aeroplane": (0, 255, 255),
-    "bicycle": (255, 235, 205),
+    "bicycle": (255, 0, 100),
     "boat": (210, 180, 140),
     "bus": (220, 220, 220),
     "car": (0, 0, 255),
-    "motorbike": (250, 0, 240),
+    "motorbike": (200, 0, 200),
     "train": (127, 255, 212),
     "bottle": (51, 161, 201),
     "chair": (139, 69, 19),
@@ -28,24 +28,26 @@ color_dict = {
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
-    parser.add_argument('--single_image', type=str, default='',
-                        help='Image path.')
+    parser.add_argument('--image_detect_path', type=str, default='',
+                        help='Image path for detection. '
+                             'If empty, the detection will not perform.')
+
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
-    parser.add_argument('--model_type', type=str, default='Tiny-YOLOv1',
-                        help='Model type. optional models: YOLOv1, Tiny-YOLOv1.')
-    parser.add_argument('--load_model', action='store_true', default=False,
-                        help="Whether to load the model from specific directory.")
-    parser.add_argument('--model_load_path', type=str, default='../models/yolov1-tiny.pth',
+    parser.add_argument('--model_load_path', type=str, default='',
                         help='Input path for models.')
+    parser.add_argument('--model_type', type=str, default='',
+                        help='Model type. optional models: YOLOv1(default), Tiny-YOLOv1. '
+                             'Not required when the loading path of the model is specified.')
 
-    parser.add_argument('--log_save_dir', type=str, default='../log',
-                        help='Output directory for logs.')
+    parser.add_argument('--graph_save_dir', type=str, default='',
+                        help='Output directory for the graph of the model. '
+                             'If empty, graph will not be saved.')
     parser.add_argument('--use_cuda', action='store_true', default=False,
                         help="Whether to use cuda to run the model.")
     """Arguments for training"""
-    parser.add_argument('--not_train', action='store_true', default=False,
-                        help="Whether not to train the model.")
+    parser.add_argument('--do_train', action='store_true', default=False,
+                        help="Whether to train the model on dataset.")
     parser.add_argument('--train_batch_size', type=int, default=64,
                         help='Batch size of train set.')
     parser.add_argument('--num_epochs', type=int, default=200,
@@ -58,30 +60,28 @@ def parse_args():
                         help='Lambda of coordinates.')
     parser.add_argument('--lambda_noobj', type=float, default=0.5,
                         help='Lambda with no objects.')
-    parser.add_argument('--clip_grad', action='store_true', default=False,
-                        help="Whether to clip gradients.")
-    parser.add_argument('--clip_max_norm', type=float, default=1000,
-                        help='Max norm of the gradients.')
-    parser.add_argument('--save_model', action='store_true', default=False,
-                        help="Whether to save the model after training.")
-    parser.add_argument('--model_save_dir', type=str, default='../models/',
-                        help='Output directory for the model.')
+    parser.add_argument('--clip_max_norm', type=float, default=0,
+                        help='Max norm of the gradients. '
+                             'If zero, the gradients will not be clipped.')
+    parser.add_argument('--model_save_dir', type=str, default='',
+                        help='Output directory for the model. '
+                             'When empty, the model will not be saved')
     """Arguments for evaluation"""
-    parser.add_argument('--not_eval', action='store_true', default=False,
-                        help="Whether not to evaluate the model.")
+    parser.add_argument('--do_eval', action='store_true', default=False,
+                        help="Whether to evaluate the model on dataset.")
     parser.add_argument('--dev_batch_size', type=int, default=8,
                         help='Batch size of dev set.')
     parser.add_argument('--score_threshold', type=float, default=0.15,
                         help='Threshold of score(IOU * P(Object)).')
-    parser.add_argument('--iou_threshold_pred', type=float, default=0.4,
+    parser.add_argument('--iou_threshold', type=float, default=0.4,
                         help='Threshold of IOU used for calculation of NMS.')
 
     parser.add_argument('--iou_thresholds_mmAP', type=list,
                         default=[0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95],
                         help='Thresholds of IOU used for calculation of mmAP.')
     """Arguments for test"""
-    parser.add_argument('--not_test', action='store_true', default=False,
-                        help="Whether not to test the model.")
+    parser.add_argument('--do_test', action='store_true', default=False,
+                        help="Whether to test the model.")
     parser.add_argument('--test_batch_size', type=int, default=16,
                         help='Batch size of test set.')
     return parser.parse_args().__dict__
