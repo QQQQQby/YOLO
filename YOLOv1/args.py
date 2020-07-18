@@ -69,8 +69,8 @@ def parse_args():
     """Arguments for evaluation"""
     parser.add_argument('--do_eval', action='store_true', default=False,
                         help="Whether to evaluate the model on dataset.")
-    parser.add_argument('--dev_batch_size', type=int, default=8,
-                        help='Batch size of dev set.')
+    parser.add_argument('--eval_batch_size', type=int, default=8,
+                        help='Batch size of evaluation set.')
     parser.add_argument('--score_threshold', type=float, default=0.15,
                         help='Threshold of score(IOU * P(Object)).')
     parser.add_argument('--iou_threshold', type=float, default=0.4,

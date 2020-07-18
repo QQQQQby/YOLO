@@ -8,26 +8,22 @@ from multiprocessing import Pool
 
 
 class DataLoader:
-    """读取数据的基类，数据以列表形式存储"""
+    """The base class for reading data, the data is stored in the form of a list"""
 
     def __init__(self, path):
-        """定义数据集根目录"""
+        """Define root directory of the dataset"""
         self.__path = path
 
     def get_data_train(self):
-        """获取训练集数据"""
         raise NotImplementedError()
 
-    def get_data_dev(self):
-        """获取开发集数据"""
+    def get_data_eval(self):
         raise NotImplementedError()
 
     def get_data_test(self):
-        """获取测试集数据"""
         raise NotImplementedError()
 
     def get_labels(self):
-        """获取所有标签"""
         raise NotImplementedError()
 
     def get_path(self):
@@ -49,7 +45,7 @@ class VOC2012Loader(DataLoader):
         self.num_processes = num_processes
 
     def get_data_train(self):
-        """多进程读取"""
+        """Use multiprocessing to read data"""
         image_object_paths = []
         for name in self.train_file_names:
             image_object_paths.append(
@@ -105,7 +101,7 @@ class VOC2012Loader(DataLoader):
     #             self.read_objects(object_paths[path_i])
     #         )
 
-    def get_data_dev(self):
+    def get_data_eval(self):
         image_object_paths = []
         for name in self.dev_file_names:
             image_object_paths.append(

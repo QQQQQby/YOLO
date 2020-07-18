@@ -1,12 +1,13 @@
 # coding: utf-8
 
-from util.functions import iou
+from util.functions import iou, show_objects
 from util.metrics import get_precision_and_recall, get_AP
 
 import torch
 from torch import nn, optim
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
+import cv2
 
 
 class YOLOv1:
@@ -251,3 +252,11 @@ class YOLOv1:
     def save_graph(self, graph_save_dir):
         with SummaryWriter(log_dir=graph_save_dir) as writer:
             writer.add_graph(self.backbone, [torch.rand(1, 448, 448, 3)])
+
+    def detect_image_and_show(self, image_path, color_dict, delay):
+        im = cv2.imread(image_path)
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        im = cv2.resize(im, (448, 448))
+        pred_results = self.predict([im])
+        print(pred_results)
+        show_objects(im, pred_results[0], color_dict, delay)

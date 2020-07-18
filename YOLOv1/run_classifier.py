@@ -23,8 +23,8 @@ class Classifier:
         print("}")
         self.args = args.copy()
 
-        data_loader = VOC2012Loader(self.args["dataset_path"])
-        self.labels = data_loader.get_labels()
+        self.data_loader = VOC2012Loader(self.args["dataset_path"])
+        self.labels = self.data_loader.get_labels()
 
         if self.args["use_cuda"] and torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -51,39 +51,36 @@ class Classifier:
             self.args
         )
 
+    def run(self):
         if self.args["image_detect_path"] != "":
-            im = cv2.imread(self.args["image_detect_path"])
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-            im = cv2.resize(im, (448, 448))
-            pred_results = self.model.predict([im])
-            print(pred_results)
-            show_objects(im, pred_results[0], self.args["colors"])
-            exit(0)
+            self.model.detect_image_and_show(
+                self.args["image_detect_path"],
+                self.args["colors"],
+                0
+            )
+
+        if not any([self.args["do_train"], self.args["do_eval"], self.args["do_test"]]):
+            return
 
         print('-' * 20 + 'Reading data' + '-' * 20, flush=True)
-
-        if self.args["do_train"]:
-            self.data_train = data_loader.get_data_train()
-        if self.args["do_eval"]:
-            self.data_dev = data_loader.get_data_dev()
-        if self.args["do_test"]:
-            self.data_test = data_loader.get_data_test()
-
-    def run(self):
-        self.model.save_graph(self.args["graph_save_dir"])
+        data_train = self.data_loader.get_data_train() if self.args["do_train"] else None
+        data_eval = self.data_loader.get_data_eval() if self.args["do_eval"] else None
+        data_test = self.data_loader.get_data_test() if self.args["do_test"] else None
+        if self.args["graph_save_dir"] != "":
+            self.model.save_graph(self.args["graph_save_dir"])
         for epoch in range(self.args["num_epochs"]):
             if self.args["do_train"]:
                 """Train"""
                 print('-' * 20 + 'Training epoch %d' % epoch + '-' * 20, flush=True)
                 time.sleep(0.5)
-                random.shuffle(self.data_train)  # 打乱训练数据
+                random.shuffle(data_train)  # 打乱训练数据
                 self.backbone.train()
                 for start in tqdm(
-                        range(0, len(self.data_train), self.args["train_batch_size"]),
+                        range(0, len(data_train), self.args["train_batch_size"]),
                         desc='Training batch: '
                 ):
-                    end = min(start + self.args["train_batch_size"], len(self.data_train))
-                    loss = self.model.train(self.data_train[start:end])
+                    end = min(start + self.args["train_batch_size"], len(data_train))
+                    loss = self.model.train(data_train[start:end])
                     print(loss)
                 """Save current model"""
                 if self.args["model_save_dir"] != "":
@@ -99,15 +96,15 @@ class Classifier:
                 self.backbone.eval()
                 pred_results = []
                 for start in tqdm(
-                        range(0, len(self.data_dev), self.args["dev_batch_size"]),
+                        range(0, len(data_eval), self.args["dev_batch_size"]),
                         desc='Evaluating batch: '
                 ):
-                    end = min(start + self.args["dev_batch_size"], len(self.data_dev))
-                    pred_results += self.model.predict([data[0] for data in self.data_dev[start:end]])
-                mmAP = self.model.get_mmAP(self.data_dev, pred_results)
+                    end = min(start + self.args["dev_batch_size"], len(data_eval))
+                    pred_results += self.model.predict([data[0] for data in data_eval[start:end]])
+                mmAP = self.model.get_mmAP(data_eval, pred_results)
                 print(mmAP)
 
-            if not self.args["do_test"]:
+            if self.args["do_test"]:
                 pass
                 # """Test"""
                 # print('-' * 20 + 'Testing epoch %d' % epoch + '-' * 20, flush=True)
