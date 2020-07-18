@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import numpy as np
+import matplotlib.pyplot as plt
 from util.functions import iou
 
 
@@ -38,8 +39,27 @@ def get_precision_and_recall(dts, gts, iou_threshold):
 
 
 def get_AP(precisions, recalls):
-    precisions = precisions.copy() + [0, 1]
-    recalls = recalls.copy() + [1, 0]
+    precisions = precisions.copy()
+    recalls = recalls.copy()
     p_r = list(zip(precisions, recalls))
-    p_r.sort(key=lambda x: -x[0])
-    print(p_r)
+    p_r.sort(key=lambda x: x[1])
+    sorted_p, sorted_r = list(zip(*p_r))
+
+    plt.plot(sorted_r, sorted_p)
+    plt.show()
+
+    p_candidates = []
+    threshold = 0
+    while threshold <= 1:
+        start = 0
+        while start < len(sorted_r):
+            if sorted_r[start] > threshold:
+                break
+            start += 1
+        if start >= len(sorted_r):
+            p_candidates.append(0)
+        else:
+            p_candidates.append(max(sorted_p[start:]))
+        threshold += 0.1
+        threshold = round(threshold * 10) / 10  # Fix accuracy error
+    return sum(p_candidates) / len(p_candidates)
