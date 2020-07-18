@@ -126,10 +126,10 @@ class VOC2012Loader(DataLoader):
         pass
 
     def get_labels(self):
-        return ["person",
-                "bird", "cat", "cow", "dog", "horse", "sheep",
-                "aeroplane", "bicycle", "boat", "bus", "car", "motorbike", "train",
-                "bottle", "chair", "diningtable", "pottedplant", "sofa", "tvmonitor"]
+        return sorted(["person",
+                       "bird", "cat", "cow", "dog", "horse", "sheep",
+                       "aeroplane", "bicycle", "boat", "bus", "car", "motorbike", "train",
+                       "bottle", "chair", "diningtable", "pottedplant", "sofa", "tvmonitor"])
 
     def read_image_and_objects(self, image_object_path):
         return (
