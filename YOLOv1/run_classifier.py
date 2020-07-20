@@ -6,6 +6,7 @@ import cv2
 import time
 import random
 from tqdm import tqdm
+import time
 
 from YOLOv1.modules import YOLOv1Backbone, TinyYOLOv1Backbone
 from data.loaders import VOC2012Loader
@@ -60,7 +61,7 @@ class Classifier:
             )
 
         if not any([self.args["do_train"], self.args["do_eval"], self.args["do_test"]]):
-            return
+            return None
 
         print('-' * 20 + 'Reading data' + '-' * 20, flush=True)
         data_train = self.data_loader.get_data_train() if self.args["do_train"] else None
@@ -96,13 +97,15 @@ class Classifier:
                 self.backbone.eval()
                 pred_results = []
                 for start in tqdm(
-                        range(0, len(data_eval), self.args["dev_batch_size"]),
+                        range(0, len(data_eval), self.args["eval_batch_size"]),
                         desc='Evaluating batch: '
                 ):
-                    end = min(start + self.args["dev_batch_size"], len(data_eval))
+                    end = min(start + self.args["eval_batch_size"], len(data_eval))
                     pred_results += self.model.predict([data[0] for data in data_eval[start:end]])
                 mmAP = self.model.get_mmAP(data_eval, pred_results)
                 print(mmAP)
+                if not self.args["do_train"]:
+                    break
 
             if self.args["do_test"]:
                 pass
@@ -122,6 +125,8 @@ class Classifier:
                 #     m.update(actual_labels, pred_labels)
                 # """testing"""
                 # print(m.get_accuracy())
+                if not self.args["do_train"]:
+                    break
             print()
 
 

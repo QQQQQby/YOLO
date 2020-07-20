@@ -31,6 +31,10 @@ def parse_args():
     parser.add_argument('--image_detect_path', type=str, default='',
                         help='Image path for detection. '
                              'If empty, the detection will not perform.')
+    parser.add_argument('--video_detect_path', type=str, default='',
+                        help='Image path for detection. '
+                             'If zero, OpenCV will predict through camera. '
+                             'If empty, the detection will not perform.')
 
     parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
                         help='Dataset path.')
@@ -69,9 +73,9 @@ def parse_args():
     """Arguments for evaluation"""
     parser.add_argument('--do_eval', action='store_true', default=False,
                         help="Whether to evaluate the model on dataset.")
-    parser.add_argument('--eval_batch_size', type=int, default=8,
+    parser.add_argument('--eval_batch_size', type=int, default=200,
                         help='Batch size of evaluation set.')
-    parser.add_argument('--score_threshold', type=float, default=0.15,
+    parser.add_argument('--score_threshold', type=float, default=0.1,
                         help='Threshold of score(IOU * P(Object)).')
     parser.add_argument('--iou_threshold', type=float, default=0.4,
                         help='Threshold of IOU used for calculation of NMS.')

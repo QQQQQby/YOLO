@@ -1,13 +1,15 @@
 # coding: utf-8
 
 from util.functions import iou, show_objects
-from util.metrics import get_precision_and_recall, get_AP
+from util.metrics import determine_TPs, get_AP, get_precision, get_recall
 
 import torch
 from torch import nn, optim
 from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+import time
 
 
 class YOLOv1:
@@ -58,12 +60,10 @@ class YOLOv1:
                     w_label = "w" + str(bbox_id)
                     h_label = "h" + str(bbox_id)
                     """计算预测的坐标"""
-                    pred_coord_dict[x_label] = (output_dict[x_label][data_id, row, col] + col) * ((448 - 1) / 7)
-                    # [0, 448 - 1]
-                    pred_coord_dict[y_label] = (output_dict[y_label][data_id, row, col] + row) * ((448 - 1) / 7)
-                    # [0, 448 - 1]
-                    pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col] * 448
-                    pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col] * 448
+                    pred_coord_dict[x_label] = output_dict[x_label][data_id, row, col]  # [0, 448 - 1]
+                    pred_coord_dict[y_label] = output_dict[y_label][data_id, row, col]  # [0, 448 - 1]
+                    pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col]
+                    pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col]
                     """计算gt与dt的IOU"""
                     ious.append(iou(
                         (int(pred_coord_dict[x_label]),
@@ -123,8 +123,18 @@ class YOLOv1:
         if output_dict is None:
             with torch.no_grad():
                 output_dict = self.get_output_dict(images)
+        score_dict = {}
+        for c_id, category in enumerate(self.labels):
+            score_dict[category] = {}
+            for bbox_id in range(2):
+                c_label = "c" + str(bbox_id)
+                score_dict[category][c_label]=(output_dict[c_label] * output_dict["probs"][..., c_id])
+        for key in output_dict.keys():
+            output_dict[key] = output_dict[key].detach().cpu()
         results = []
         for image_id in range(len(images)):
+
+            print(image_id)
             results.append([])
             """使用NMS算法选择检测的目标"""
             for category in self.labels:
@@ -137,20 +147,15 @@ class YOLOv1:
                             w_label = "w" + str(bbox_id)
                             h_label = "h" + str(bbox_id)
                             c_label = "c" + str(bbox_id)
-                            score = (output_dict[c_label][image_id, row, col] *
-                                     output_dict["probs"][image_id, row, col, self.labels.index(category)]) \
-                                .detach().cpu().numpy()
-                            # print("score = " + str(score))
+                            score = score_dict[category][c_label][image_id, row, col]
                             if score >= self.score_threshold:
                                 candidates.append({
                                     "name": category,
                                     "score": score,
-                                    "x": float(
-                                        (output_dict[x_label][image_id, row, col] + col).detach() * ((448 - 1) / 7)),
-                                    "y": float(
-                                        (output_dict[y_label][image_id, row, col] + row).detach() * ((448 - 1) / 7)),
-                                    "w": float((output_dict[w_label][image_id, row, col]).detach()) * 448,
-                                    "h": float((output_dict[h_label][image_id, row, col]).detach()) * 448
+                                    "x": float(output_dict[x_label][image_id, row, col]),
+                                    "y": float(output_dict[y_label][image_id, row, col]),
+                                    "w": float(output_dict[w_label][image_id, row, col]),
+                                    "h": float(output_dict[h_label][image_id, row, col])
                                 })
                 candidates.sort(key=lambda x: -x["score"])  # 将所有候选bounding box按分数从高到低排列
                 for c_i in range(len(candidates) - 1):
@@ -177,37 +182,52 @@ class YOLOv1:
     def get_mmAP(self, batch, pred_results=None):
         if pred_results is None:
             pred_results = self.predict([data[0] for data in batch])
+        gt_dict = {}
+        dt_dict = {}
+        for category in self.labels:
+            gt_dict[category] = [[] for i in range(len(batch))]
+            dt_dict[category] = [[] for i in range(len(batch))]
         for data_id in range(len(batch)):
-            dt_list = pred_results[data_id]
-            dt_dict = {}
-            for category in self.labels:
-                dt_dict[category] = []
-            for dt in dt_list:
-                dt_dict[dt["name"]].append(dt)
-
             gt_list = batch[data_id][1]
-            gt_dict = {}
-            for category in self.labels:
-                gt_dict[category] = []
             for gt in gt_list:
-                gt_dict[gt["name"]].append(gt)
+                gt_dict[gt["name"]][data_id].append(gt)
+            dt_list = pred_results[data_id]
+            for dt in dt_list:
+                dt_dict[dt["name"]][data_id].append(dt)
 
-            mAPs = []
-            for threshold in self.iou_thresholds_mmAP:
-                APs = []
-                for category in self.labels:
-                    dts = dt_dict[category]
-                    gts = gt_dict[category]
-                    dts.sort(key=lambda x: -x["score"])  # Sort dts in descending order
-                    precisions = []
-                    recalls = []
-                    for n in range(1, len(dts)):
-                        p, r = get_precision_and_recall(dts[:n], gts, threshold)
-                        precisions.append(p)
-                        recalls.append(r)
-                    APs.append(get_AP(precisions, recalls))
-                mAPs.append(sum(APs) / len(APs))
-            mmAP = sum(mAPs) / len(mAPs)
+        mAPs = []
+        for threshold in self.iou_thresholds_mmAP:
+            APs = []
+            for category in self.labels:
+                are_tps = []
+                for data_id in range(len(batch)):
+                    dts = dt_dict[category][data_id]
+                    gts = gt_dict[category][data_id]
+                    are_tps.append(determine_TPs(dts, gts, threshold))
+                detections = []
+                fn = 0
+                for data_id in range(len(batch)):
+                    fn += len(gt_dict[category][data_id])
+                    for index, dt in enumerate(dt_dict[category][data_id]):
+                        detections.append((data_id, dt, are_tps[data_id][index]))
+                detections.sort(key=lambda x: -x[1]["score"])
+                precisions, recalls = [], []
+                tp, fp = 0, 0
+                for dt_tuple in detections:
+                    if dt_tuple[2]:
+                        tp += 1
+                        fn -= 1
+                    else:
+                        fp += 1
+                    precisions.append(get_precision(tp, fp))
+                    recalls.append(get_recall(tp, fn))
+                # plt.plot(recalls, precisions)
+                # plt.show()
+                APs.append(get_AP(precisions, recalls))
+                print("AP of", category, "=", get_AP(precisions, recalls))
+            mAPs.append(sum(APs) / len(APs))
+        mmAP = sum(mAPs) / len(mAPs)
+        return mmAP
 
     def get_output_dict(self, images):
         output_tensor = self.backbone(
@@ -231,18 +251,16 @@ class YOLOv1:
             c_label = "c" + str(bbox_id)
             output_dict[x_label] = coords[..., bbox_id, 0]
             output_dict[y_label] = coords[..., bbox_id, 1]
-            output_dict[w_label] = coords[..., bbox_id, 2] ** 2
-            output_dict[h_label] = coords[..., bbox_id, 3] ** 2
+            output_dict[w_label] = coords[..., bbox_id, 2] ** 2 * 448
+            output_dict[h_label] = coords[..., bbox_id, 3] ** 2 * 448
             output_dict[c_label] = confs[..., bbox_id]
         output_dict['probs'] = probs
 
-        # for row in range(S):
-        #     for col in range(S):
-        #         for bbox_id in range(B):
-        #             coords[:, row, col, bbox_id, 0] = (coords[:, row, col, bbox_id, 0] + col) / S
-        #             coords[:, row, col, bbox_id, 1] = (coords[:, row, col, bbox_id, 1] + row) / S
-        #             coords[:, row, col, bbox_id, 2] = coords[:, row, col, bbox_id, 2] ** 2  # 2 or 0.5?
-        #             coords[:, row, col, bbox_id, 3] = coords[:, row, col, bbox_id, 3] ** 2
+        for row in range(S):
+            for col in range(S):
+                for bbox_id in range(B):
+                    coords[:, row, col, bbox_id, 0] = (coords[:, row, col, bbox_id, 0] + col) * ((448 - 1) / 7)
+                    coords[:, row, col, bbox_id, 1] = (coords[:, row, col, bbox_id, 1] + row) * ((448 - 1) / 7)
 
         return output_dict
 

@@ -81,10 +81,10 @@ with tf.Session() as sess:
         layer.running_var = torch.nn.Parameter(torch.tensor(stds) ** 2, requires_grad=False)
     for bn_id, gammas in enumerate(bn_gammas):
         layer = getattr(pth_model, "batch_norm" + str(bn_id + 1))
-        layer.weight = torch.nn.Parameter(torch.tensor(gammas), requires_grad=False)
+        layer.weight = torch.nn.Parameter(torch.tensor(gammas), requires_grad=True)
     for bn_id, betas in enumerate(bn_betas):
         layer = getattr(pth_model, "batch_norm" + str(bn_id + 1))
-        layer.bias = torch.nn.Parameter(torch.tensor(betas), requires_grad=False)
+        layer.bias = torch.nn.Parameter(torch.tensor(betas), requires_grad=True)
 
     for fc_id, weights in enumerate(fc_weights):
         layer = getattr(pth_model, "fc" + str(fc_id + 1))
@@ -93,12 +93,14 @@ with tf.Session() as sess:
         layer = getattr(pth_model, "fc" + str(fc_id + 1))
         layer.bias = torch.nn.Parameter(torch.tensor(biases), requires_grad=True)
 
-    torch.save(pth_model, save_path)
+    # torch.save(pth_model, save_path)
     """validate"""
     # inp = np.random.random([1, 448, 448, 3]) * 128
     # inp = np.array(inp, dtype=np.uint8)
-    inp = cv2.imread("dog.jpg").copy()
-    inp = inp[:, :, ::-1] / 255.
+    inp = cv2.imread("image_samples/dog.jpg").copy()
+    inp = inp[:, :, ::-1]
+    inp = inp / 255.
+    inp = inp.copy()
 
     inp = np.expand_dims(inp, 0)
 
@@ -118,27 +120,27 @@ with tf.Session() as sess:
     output_pth = pth_model(torch.from_numpy(inp))
 
     tff = lambda x: sess.run(sess.graph.get_tensor_by_name(x), feed_dict={"input:0": inp})
-    print(
-        outputs_pth['conv1'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -
-        tff("0-convolutional:0")
-    )
+    # print(
+    #     outputs_pth['conv1'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -
+    #     tff("0-convolutional:0")
+    # )
     # print(
     #     (outputs_pth['conv1'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) - tff("sub/y:0")) /
     #     tff("truediv/y:0") * tff("mul/y:0") + tff("BiasAdd/bias:0") -
     #     tff("BiasAdd:0")
     # )
-    print(
-        outputs_pth['conv3'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -
-        tff("6-convolutional:0")
-    )
-    print(
-        outputs_pth['conv8'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -
-        tff("20-convolutional:0")
-    )
+    # print(
+    #     outputs_pth['conv3'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -
+    #     tff("6-convolutional:0")
+    # )
+    # print(
+    #     outputs_pth['conv8'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -
+    #     tff("20-convolutional:0")
+    # )
     print(
         outputs_pth['fc1'].detach().numpy() -
         tff("output:0")
     )
-    print([[0.00112486, -0.00016582, -0.00093555, -0.00109863, -0.00133038, -0.00104356]])
+    print([[-3.1515956e-06, 7.7709556e-06, -1.6540289e-06, 8.5234642e-06, 6.6757202e-06, -5.9604645e-08]])
 
     print()
