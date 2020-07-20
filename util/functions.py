@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from typing import List, Tuple, Dict
 
+from functools import wraps
 
 def iou(bbox0: Tuple[float, float, float, float], bbox1: Tuple[float, float, float, float]) -> float:
     x0, y0, w0, h0 = bbox0[:4]
@@ -46,3 +47,50 @@ def draw_image(image_array: np.ndarray, objects, color_dict):
         upper_left = (upper_left[0] + 2, max(upper_left[1] - 4, 12))
         cv2.putText(image, o['name'], upper_left, cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255)[::-1], 1)
     return image
+
+
+def NMS(output_dict, image_id, labels, score_threshold, iou_threshold):
+    results = []
+    for category in labels:
+        candidates = []
+        for row in range(7):
+            for col in range(7):
+                for bbox_id in range(2):
+                    x_label = "x" + str(bbox_id)
+                    y_label = "y" + str(bbox_id)
+                    w_label = "w" + str(bbox_id)
+                    h_label = "h" + str(bbox_id)
+                    c_label = "c" + str(bbox_id)
+                    score = float(output_dict[c_label][image_id, row, col] *
+                                  output_dict["probs"][image_id, row, col, labels.index(category)])
+                    if score >= score_threshold:
+                        candidates.append({
+                            "name": category,
+                            "score": score,
+                            "x": float(output_dict[x_label][image_id, row, col]),
+                            "y": float(output_dict[y_label][image_id, row, col]),
+                            "w": float(output_dict[w_label][image_id, row, col]),
+                            "h": float(output_dict[h_label][image_id, row, col])
+                        })
+        candidates.sort(key=lambda x: -x["score"])
+        for c_i in range(len(candidates) - 1):
+            if candidates[c_i]["score"] > 0:
+                for c_j in range(c_i + 1, len(candidates)):
+                    if iou(
+                            (candidates[c_i]["x"],
+                             candidates[c_i]["y"],
+                             candidates[c_i]["w"],
+                             candidates[c_i]["h"]),
+                            (candidates[c_j]["x"],
+                             candidates[c_j]["y"],
+                             candidates[c_j]["w"],
+                             candidates[c_j]["h"])
+                    ) > iou_threshold:
+                        candidates[c_j]["score"] = -1
+        results += list(filter(lambda x: x["score"] >= 0, candidates))
+    return results
+
+
+def NMS_multi_process(inp):
+    # output_dict, image_id, labels, score_threshold, iou_threshold
+    return NMS(*inp)

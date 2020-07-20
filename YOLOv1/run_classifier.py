@@ -24,7 +24,7 @@ class Classifier:
         print("}")
         self.args = args.copy()
 
-        self.data_loader = VOC2012Loader(self.args["dataset_path"])
+        self.data_loader = VOC2012Loader(self.args["dataset_path"], num_processes=4)
         self.labels = self.data_loader.get_labels()
 
         if self.args["use_cuda"] and torch.cuda.is_available():
@@ -101,9 +101,9 @@ class Classifier:
                         desc='Evaluating batch: '
                 ):
                     end = min(start + self.args["eval_batch_size"], len(data_eval))
-                    pred_results += self.model.predict([data[0] for data in data_eval[start:end]])
+                    pred_results += self.model.predict([data[0] for data in data_eval[start:end]], num_processes=4)
                 mmAP = self.model.get_mmAP(data_eval, pred_results)
-                print(mmAP)
+                print("mmAP =", mmAP)
                 if not self.args["do_train"]:
                     break
 

@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from util.functions import iou, show_objects
+from util.functions import iou, show_objects, NMS, NMS_multi_process
 from util.metrics import determine_TPs, get_AP, get_precision, get_recall
 
 import torch
@@ -10,6 +10,8 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import time
+from multiprocessing import Pool
+import threading
 
 
 class YOLOv1:
@@ -119,64 +121,52 @@ class YOLOv1:
                             loss += self.lambda_noobj * (output_dict[c_label][data_id, i, j] - 0) ** 2
         return loss
 
-    def predict(self, images, output_dict=None):
+    def predict(self, images, output_dict=None, num_processes=8):
         if output_dict is None:
             with torch.no_grad():
                 output_dict = self.get_output_dict(images)
-        score_dict = {}
-        for c_id, category in enumerate(self.labels):
-            score_dict[category] = {}
-            for bbox_id in range(2):
-                c_label = "c" + str(bbox_id)
-                score_dict[category][c_label]=(output_dict[c_label] * output_dict["probs"][..., c_id])
         for key in output_dict.keys():
-            output_dict[key] = output_dict[key].detach().cpu()
-        results = []
-        for image_id in range(len(images)):
-
-            print(image_id)
-            results.append([])
-            """使用NMS算法选择检测的目标"""
-            for category in self.labels:
-                candidates = []
-                for row in range(7):
-                    for col in range(7):
-                        for bbox_id in range(2):
-                            x_label = "x" + str(bbox_id)
-                            y_label = "y" + str(bbox_id)
-                            w_label = "w" + str(bbox_id)
-                            h_label = "h" + str(bbox_id)
-                            c_label = "c" + str(bbox_id)
-                            score = score_dict[category][c_label][image_id, row, col]
-                            if score >= self.score_threshold:
-                                candidates.append({
-                                    "name": category,
-                                    "score": score,
-                                    "x": float(output_dict[x_label][image_id, row, col]),
-                                    "y": float(output_dict[y_label][image_id, row, col]),
-                                    "w": float(output_dict[w_label][image_id, row, col]),
-                                    "h": float(output_dict[h_label][image_id, row, col])
-                                })
-                candidates.sort(key=lambda x: -x["score"])  # 将所有候选bounding box按分数从高到低排列
-                for c_i in range(len(candidates) - 1):
-                    if candidates[c_i]["score"] > 0:
-                        for c_j in range(c_i + 1, len(candidates)):
-                            if iou(
-                                    (candidates[c_i]["x"],
-                                     candidates[c_i]["y"],
-                                     candidates[c_i]["w"],
-                                     candidates[c_i]["h"]),
-                                    (candidates[c_j]["x"],
-                                     candidates[c_j]["y"],
-                                     candidates[c_j]["w"],
-                                     candidates[c_j]["h"])
-                            ) > self.iou_threshold:
-                                candidates[c_j]["score"] = -1
-                for c_i in range(len(candidates)):
-                    # print(candidates[c_i])
-                    if candidates[c_i]["score"] > 0:
-                        results[-1].append(candidates[c_i])
-        # print(results)
+            output_dict[key] = output_dict[key].detach().cpu().numpy()
+        a = time.time()
+        if num_processes == 0:
+            results = []
+            for image_id in range(len(images)):
+                results.append(NMS(output_dict, image_id, self.labels, self.score_threshold, self.iou_threshold))
+        else:
+            p = Pool(num_processes)
+            inputs = []
+            for image_id in range(len(images)):
+                inputs.append((output_dict, image_id, self.labels, self.score_threshold, self.iou_threshold))
+            results = p.map(
+                NMS_multi_process,
+                inputs
+            )
+            p.close()
+            p.join()
+            # results = [[] for i in range(len(images))]
+            #
+            # num_images_per_thread = (len(images)-1)//num_threads+1
+            # num_threads = (len(images)-1)//num_images_per_thread+1
+            # image_id_slices = []
+            # for thread_id in range(num_threads):
+            #     image_id_slices.append(list(range(
+            #         thread_id*num_images_per_thread,
+            #         min((thread_id+1)*num_images_per_thread, len(images))
+            #     )))
+            # print(image_id_slices)
+            #
+            # thread_pool = []
+            # for thread_id in range(num_threads):
+            #     thread_pool.append(threading.Thread(
+            #         target=NMS_multi_images,
+            #         args=(results, output_dict, image_id_slices[thread_id], self.labels, self.score_threshold, self.iou_threshold)
+            #     ))
+            # for thread_id in range(num_threads):
+            #     thread_pool[thread_id].start()
+            # for thread_id in range(num_threads):
+            #     thread_pool[thread_id].join()
+        b = time.time()
+        print(b - a, "s")
         return results
 
     def get_mmAP(self, batch, pred_results=None):
@@ -224,7 +214,7 @@ class YOLOv1:
                 # plt.plot(recalls, precisions)
                 # plt.show()
                 APs.append(get_AP(precisions, recalls))
-                print("AP of", category, "=", get_AP(precisions, recalls))
+                # print("AP of", category, "=", get_AP(precisions, recalls))
             mAPs.append(sum(APs) / len(APs))
         mmAP = sum(mAPs) / len(mAPs)
         return mmAP
