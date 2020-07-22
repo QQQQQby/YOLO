@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from util.functions import iou, show_objects, NMS, NMS_multi_process
+from util.functions import iou, show_objects, NMS, NMS_multi_process, draw_image
 from util.metrics import determine_TPs, get_AP, get_precision, get_recall
 from YOLOv1.modules import YOLOv1Backbone
 
@@ -43,7 +43,10 @@ class YOLOv1:
         else:
             self.B = 2
 
-    def train(self, batch):
+    def train(self, batch, do_preprocess=False):
+        if do_preprocess:
+            for data_id in range(len(batch)):
+                batch[data_id][0] = self.preprocess(batch[data_id][0])
         self.optimizer.zero_grad()
         loss = self.get_loss(batch)
         loss.backward()
@@ -270,9 +273,30 @@ class YOLOv1:
             writer.add_graph(self.backbone, [torch.rand(1, self.image_size, self.image_size, 3)])
 
     def detect_image_and_show(self, image_path, color_dict, delay):
-        im = cv2.imread(image_path)
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        im = cv2.resize(im, (self.image_size, self.image_size))
-        pred_results = self.predict([im],num_processes=0)
+        im = self.preprocess(image_path, cvt_RGB=True)
+        pred_results = self.predict([im], num_processes=0)
         print(pred_results)
         show_objects(im, pred_results[0], color_dict, delay)
+
+    def detect_video_and_show(self, video_path, color_dict):
+        if video_path == "0":
+            capture = cv2.VideoCapture(0)
+        else:
+            capture = cv2.VideoCapture(video_path)
+        while capture.isOpened():
+            ret, frame = capture.read()
+            # frame = cv2.rotate(frame, 0)
+            frame = self.preprocess(frame)
+            frame = draw_image(frame, self.predict([frame], num_processes=0)[0],color_dict)
+            cv2.namedWindow("Object Detection", 0)
+            cv2.resizeWindow("Object Detection", self.image_size, self.image_size)
+            cv2.imshow("Object Detection", frame)
+            """设置每帧时间"""
+            cv2.waitKey(30)
+
+    def preprocess(self, image, cvt_RGB=False):
+        if isinstance(image, str):
+            image = cv2.imread(image)
+        if cvt_RGB:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        return cv2.resize(image, (self.image_size, self.image_size)).copy()

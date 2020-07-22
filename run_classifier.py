@@ -56,6 +56,11 @@ class Classifier:
                 0
             )
 
+        if self.args["video_detect_path"] != "":
+            self.model.detect_video_and_show(
+                self.args["video_detect_path"],
+                self.args["colors"],
+            )
         if not any([self.args["do_train"], self.args["do_eval"], self.args["do_test"]]):
             return None
 
