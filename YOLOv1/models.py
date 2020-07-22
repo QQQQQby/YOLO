@@ -139,7 +139,7 @@ class YOLOv1:
                 output_dict = self.get_output_dict(images)
         for key in output_dict.keys():
             output_dict[key] = output_dict[key].detach().cpu().numpy()
-        a = time.time()
+        # a = time.time()
         if num_processes == 0:
             results = []
             for image_id in range(len(images)):
@@ -177,8 +177,8 @@ class YOLOv1:
             #     thread_pool[thread_id].start()
             # for thread_id in range(num_threads):
             #     thread_pool[thread_id].join()
-        b = time.time()
-        print(b - a, "s")
+        # b = time.time()
+        # print(b - a, "s")
         return results
 
     def get_mmAP(self, batch, pred_results=None):
@@ -286,13 +286,13 @@ class YOLOv1:
         while capture.isOpened():
             ret, frame = capture.read()
             # frame = cv2.rotate(frame, 0)
-            frame = self.preprocess(frame)
-            frame = draw_image(frame, self.predict([frame], num_processes=0)[0],color_dict)
+            frame = self.preprocess(frame, cvt_RGB=True)
+            frame = draw_image(frame, self.predict([frame], num_processes=0)[0], color_dict)
             cv2.namedWindow("Object Detection", 0)
             cv2.resizeWindow("Object Detection", self.image_size, self.image_size)
             cv2.imshow("Object Detection", frame)
             """设置每帧时间"""
-            cv2.waitKey(30)
+            cv2.waitKey(1)
 
     def preprocess(self, image, cvt_RGB=False):
         if isinstance(image, str):

@@ -72,7 +72,7 @@ def NMS(output_dict, image_id, model):
                             "w": float(output_dict[w_label][image_id, row, col]),
                             "h": float(output_dict[h_label][image_id, row, col])
                         })
-        print(candidates)
+        # print(candidates)
         candidates.sort(key=lambda x: -x["score"])
         for c_i in range(len(candidates) - 1):
             if candidates[c_i]["score"] > 0:

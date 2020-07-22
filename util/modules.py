@@ -55,7 +55,7 @@ class LocallyConnected2d(nn.Module):
             b = self.bias.unsqueeze(0)
             # print("b:", b.shape)
             x += b
-        print("out:", x.shape)
+        # print("out:", x.shape)
         return x
 
 
