@@ -2,18 +2,14 @@
 
 import torch
 import os
-import cv2
-import time
 import random
 from tqdm import tqdm
 import time
 
 from YOLOv1.modules import YOLOv1Backbone, TinyYOLOv1Backbone
 from data.loaders import VOC2012Loader
-from util import metrics
-from util.functions import show_objects
 from YOLOv1.models import YOLOv1
-from YOLOv1.args import get_args
+from args import get_args
 
 
 class Classifier:
@@ -101,7 +97,7 @@ class Classifier:
                         desc='Evaluating batch: '
                 ):
                     end = min(start + self.args["eval_batch_size"], len(data_eval))
-                    pred_results += self.model.predict([data[0] for data in data_eval[start:end]], num_processes=4)
+                    pred_results += self.model.predict([data[0] for data in data_eval[start:end]], num_processes=0)
                 mmAP = self.model.get_mmAP(data_eval, pred_results)
                 print("mmAP =", mmAP)
                 if not self.args["do_train"]:

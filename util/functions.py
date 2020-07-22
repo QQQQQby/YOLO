@@ -49,21 +49,21 @@ def draw_image(image_array: np.ndarray, objects, color_dict):
     return image
 
 
-def NMS(output_dict, image_id, labels, score_threshold, iou_threshold):
+def NMS(output_dict, image_id, model):
     results = []
-    for category in labels:
+    for category in model.labels:
         candidates = []
-        for row in range(7):
-            for col in range(7):
-                for bbox_id in range(2):
+        for row in range(model.S):
+            for col in range(model.S):
+                for bbox_id in range(model.B):
                     x_label = "x" + str(bbox_id)
                     y_label = "y" + str(bbox_id)
                     w_label = "w" + str(bbox_id)
                     h_label = "h" + str(bbox_id)
                     c_label = "c" + str(bbox_id)
                     score = float(output_dict[c_label][image_id, row, col] *
-                                  output_dict["probs"][image_id, row, col, labels.index(category)])
-                    if score >= score_threshold:
+                                  output_dict["probs"][image_id, row, col, model.labels.index(category)])
+                    if score >= model.score_threshold:
                         candidates.append({
                             "name": category,
                             "score": score,
@@ -72,6 +72,7 @@ def NMS(output_dict, image_id, labels, score_threshold, iou_threshold):
                             "w": float(output_dict[w_label][image_id, row, col]),
                             "h": float(output_dict[h_label][image_id, row, col])
                         })
+        print(candidates)
         candidates.sort(key=lambda x: -x["score"])
         for c_i in range(len(candidates) - 1):
             if candidates[c_i]["score"] > 0:
@@ -85,7 +86,7 @@ def NMS(output_dict, image_id, labels, score_threshold, iou_threshold):
                              candidates[c_j]["y"],
                              candidates[c_j]["w"],
                              candidates[c_j]["h"])
-                    ) > iou_threshold:
+                    ) > model.iou_threshold:
                         candidates[c_j]["score"] = -1
         results += list(filter(lambda x: x["score"] >= 0, candidates))
     return results

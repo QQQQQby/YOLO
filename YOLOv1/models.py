@@ -2,6 +2,7 @@
 
 from util.functions import iou, show_objects, NMS, NMS_multi_process
 from util.metrics import determine_TPs, get_AP, get_precision, get_recall
+from YOLOv1.modules import YOLOv1Backbone
 
 import torch
 from torch import nn, optim
@@ -34,6 +35,14 @@ class YOLOv1:
         self.iou_threshold = args["iou_threshold"]
         self.iou_thresholds_mmAP = args["iou_thresholds_mmAP"]
 
+        self.num_classes = len(labels)
+        self.image_size = 448
+        self.S = 7
+        if isinstance(backbone, YOLOv1Backbone):
+            self.B = 3
+        else:
+            self.B = 2
+
     def train(self, batch):
         self.optimizer.zero_grad()
         loss = self.get_loss(batch)
@@ -49,21 +58,21 @@ class YOLOv1:
 
         loss = torch.tensor(0.0)
         for data_id in range(len(batch)):
-            has_positive = np.zeros((7, 7), np.bool)
+            has_positive = np.zeros((self.S, self.S), np.bool)
             for true_dict in object_info_dicts[data_id]:
                 """获取label对应的栅格所在的行和列"""
-                row = int(true_dict['y'] // (448 / 7))  # [0, 6]
-                col = int(true_dict['x'] // (448 / 7))  # [0, 6]
+                row = int(true_dict['y'] // (self.image_size / self.S))  # [0, 6]
+                col = int(true_dict['x'] // (self.image_size / self.S))  # [0, 6]
                 ious = []
                 pred_coord_dict = {}
-                for bbox_id in range(2):
+                for bbox_id in range(self.B):
                     x_label = "x" + str(bbox_id)
                     y_label = "y" + str(bbox_id)
                     w_label = "w" + str(bbox_id)
                     h_label = "h" + str(bbox_id)
                     """计算预测的坐标"""
-                    pred_coord_dict[x_label] = output_dict[x_label][data_id, row, col]  # [0, 448 - 1]
-                    pred_coord_dict[y_label] = output_dict[y_label][data_id, row, col]  # [0, 448 - 1]
+                    pred_coord_dict[x_label] = output_dict[x_label][data_id, row, col]  # [0, self.image_size - 1]
+                    pred_coord_dict[y_label] = output_dict[y_label][data_id, row, col]  # [0, self.image_size - 1]
                     pred_coord_dict[w_label] = output_dict[w_label][data_id, row, col]
                     pred_coord_dict[h_label] = output_dict[h_label][data_id, row, col]
                     """计算gt与dt的IOU"""
@@ -96,14 +105,14 @@ class YOLOv1:
                 #                            (pred_coord_dict[h_label] ** 0.5 - true_dict['h'] ** 0.5) ** 2))
                 loss += (output_dict[c_label][data_id, row, col] - 1) ** 2
                 """未被选中的(即IOU较小的)bounding box，取其置信度为0进行损失计算"""
-                for bbox_id in range(2):
+                for bbox_id in range(self.B):
                     if bbox_id == chosen_bbox_id:
                         continue
                     c_label = "c" + str(bbox_id)
                     loss += self.lambda_noobj * (output_dict[c_label][data_id, row, col] - 0) ** 2
                 """概率损失"""
                 prob_loss = nn.MSELoss(reduction="sum")
-                true_porbs = torch.zeros((20,))
+                true_porbs = torch.zeros((self.num_classes))
                 true_porbs[self.labels.index(true_dict['name'])] = 1
                 # print("Prob loss =", prob_loss(output_dict['probs'][data_id, row, col], true_porbs))
                 loss += prob_loss(
@@ -113,10 +122,10 @@ class YOLOv1:
                 """统计有gt的栅格"""
                 has_positive[row, col] = True
             """取未被选中的(即IOU较小的)栅格中的两个bounding box置信度为0"""
-            for i in range(7):
-                for j in range(7):
+            for i in range(self.S):
+                for j in range(self.S):
                     if not has_positive[i, j]:
-                        for bbox_id in range(2):
+                        for bbox_id in range(self.B):
                             c_label = "c" + str(bbox_id)
                             loss += self.lambda_noobj * (output_dict[c_label][data_id, i, j] - 0) ** 2
         return loss
@@ -131,12 +140,12 @@ class YOLOv1:
         if num_processes == 0:
             results = []
             for image_id in range(len(images)):
-                results.append(NMS(output_dict, image_id, self.labels, self.score_threshold, self.iou_threshold))
+                results.append(NMS(output_dict, image_id, self))
         else:
             p = Pool(num_processes)
             inputs = []
             for image_id in range(len(images)):
-                inputs.append((output_dict, image_id, self.labels, self.score_threshold, self.iou_threshold))
+                inputs.append((output_dict, image_id, self))
             results = p.map(
                 NMS_multi_process,
                 inputs
@@ -222,18 +231,15 @@ class YOLOv1:
     def get_output_dict(self, images):
         output_tensor = self.backbone(
             torch.from_numpy(np.array(images) / 255.).to(self.device)
-        )  # batch_size, 1470
+        )  # batch_size, 1470 or 1715
 
-        num_classes = 20
-        S = 7
-        B = 2
-
-        probs = output_tensor[:, :S * S * num_classes].view(-1, S, S, num_classes)
-        confs = output_tensor[:, S * S * num_classes:S * S * (num_classes + B)].view(-1, S, S, B)
-        coords = output_tensor[:, S * S * (num_classes + B):].view(-1, S, S, B, 4)
+        probs = output_tensor[:, :self.S * self.S * self.num_classes].view(-1, self.S, self.S, self.num_classes)
+        confs = output_tensor[:, self.S * self.S * self.num_classes:self.S * self.S * (self.num_classes + self.B)]
+        confs = confs.view(-1, self.S, self.S, self.B)
+        coords = output_tensor[:, self.S * self.S * (self.num_classes + self.B):].view(-1, self.S, self.S, self.B, 4)
 
         output_dict = {}
-        for bbox_id in range(B):
+        for bbox_id in range(self.B):
             x_label = "x" + str(bbox_id)
             y_label = "y" + str(bbox_id)
             w_label = "w" + str(bbox_id)
@@ -241,16 +247,18 @@ class YOLOv1:
             c_label = "c" + str(bbox_id)
             output_dict[x_label] = coords[..., bbox_id, 0]
             output_dict[y_label] = coords[..., bbox_id, 1]
-            output_dict[w_label] = coords[..., bbox_id, 2] ** 2 * 448
-            output_dict[h_label] = coords[..., bbox_id, 3] ** 2 * 448
+            output_dict[w_label] = coords[..., bbox_id, 2] ** 2 * self.image_size
+            output_dict[h_label] = coords[..., bbox_id, 3] ** 2 * self.image_size
             output_dict[c_label] = confs[..., bbox_id]
         output_dict['probs'] = probs
 
-        for row in range(S):
-            for col in range(S):
-                for bbox_id in range(B):
-                    coords[:, row, col, bbox_id, 0] = (coords[:, row, col, bbox_id, 0] + col) * ((448 - 1) / 7)
-                    coords[:, row, col, bbox_id, 1] = (coords[:, row, col, bbox_id, 1] + row) * ((448 - 1) / 7)
+        for row in range(self.S):
+            for col in range(self.S):
+                for bbox_id in range(self.B):
+                    coords[:, row, col, bbox_id, 0] = (coords[:, row, col, bbox_id, 0] + col) \
+                                                      * ((self.image_size - 1) / self.S)
+                    coords[:, row, col, bbox_id, 1] = (coords[:, row, col, bbox_id, 1] + row) \
+                                                      * ((self.image_size - 1) / self.S)
 
         return output_dict
 
@@ -259,12 +267,12 @@ class YOLOv1:
 
     def save_graph(self, graph_save_dir):
         with SummaryWriter(log_dir=graph_save_dir) as writer:
-            writer.add_graph(self.backbone, [torch.rand(1, 448, 448, 3)])
+            writer.add_graph(self.backbone, [torch.rand(1, self.image_size, self.image_size, 3)])
 
     def detect_image_and_show(self, image_path, color_dict, delay):
         im = cv2.imread(image_path)
         im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-        im = cv2.resize(im, (448, 448))
-        pred_results = self.predict([im])
+        im = cv2.resize(im, (self.image_size, self.image_size))
+        pred_results = self.predict([im],num_processes=0)
         print(pred_results)
         show_objects(im, pred_results[0], color_dict, delay)

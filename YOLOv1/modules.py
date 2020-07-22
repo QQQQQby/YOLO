@@ -4,6 +4,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+from util.modules import LocallyConnected2d
+
 
 class YOLOv1Backbone(nn.Module):
     def __init__(self):
@@ -51,9 +53,9 @@ class YOLOv1Backbone(nn.Module):
         self.conv24 = nn.Conv2d(1024, 1024, 3, stride=1, padding=1, bias=False)
         self.batch_norm24 = nn.BatchNorm2d(1024)
 
-        self.fc1 = nn.Linear(1024 * 7 * 7, 4096, bias=True)
-        self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(4096, 7 * 7 * 30, bias=True)
+        self.local1 = LocallyConnected2d(1024, 256, 3, 7, stride=1, padding=1, bias=False)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(256 * 7 * 7, 7 * 7 * 35, bias=True)
 
     def forward(self, x):
         """448 * 448 * 3"""
@@ -86,14 +88,14 @@ class YOLOv1Backbone(nn.Module):
             x = getattr(self, 'batch_norm%d' % i)(x)
             x = F.leaky_relu(x, 0.1, inplace=True)
         """1024 * 7 * 7"""
-        x = x.view(-1, 1024 * 7 * 7)
-        """50176"""
-        x = self.fc1(x)
-        x = self.dropout(x)
+        x = self.local1(x)
         x = F.leaky_relu(x, 0.1, inplace=True)
-        """4096"""
-        x = self.fc2(x)
-        """1470"""
+        """256 * 7 * 7"""
+        x = x.view(-1, 256 * 7 * 7)
+        """12544"""
+        x = self.dropout1(x)
+        x = self.fc1(x)
+        """1715"""
         return x
 
 
