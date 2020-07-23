@@ -40,9 +40,10 @@ def parse_args():
                         help='Dataset path.')
     parser.add_argument('--model_load_path', type=str, default='',
                         help='Input path for models.')
-    parser.add_argument('--model_type', type=str, default='',
-                        help='Model type. optional models: YOLOv1(default), Tiny-YOLOv1. '
-                             'Not required when the loading path of the model is specified.')
+    parser.add_argument('--model_name', type=str, default='yolov1',
+                        help='Model type. optional models: yolov1(default), yolov1-tiny. '
+                             'Not required when the loading path of the model is specified.',
+                        choices=["yolov1", "yolov1-tiny"])
 
     parser.add_argument('--graph_save_dir', type=str, default='',
                         help='Output directory for the graph of the model. '
@@ -52,7 +53,7 @@ def parse_args():
     """Arguments for training"""
     parser.add_argument('--do_train', action='store_true', default=False,
                         help="Whether to train the model on dataset.")
-    parser.add_argument('--train_batch_size', type=int, default=64,
+    parser.add_argument('--train_batch_size', type=int, default=4,
                         help='Batch size of train set.')
     parser.add_argument('--num_epochs', type=int, default=200,
                         help='Number of epochs.')
@@ -73,7 +74,7 @@ def parse_args():
     """Arguments for evaluation"""
     parser.add_argument('--do_eval', action='store_true', default=False,
                         help="Whether to evaluate the model on dataset.")
-    parser.add_argument('--eval_batch_size', type=int, default=200,
+    parser.add_argument('--eval_batch_size', type=int, default=4,
                         help='Batch size of evaluation set.')
     parser.add_argument('--score_threshold', type=float, default=0.1,
                         help='Threshold of score(IOU * P(Object)).')

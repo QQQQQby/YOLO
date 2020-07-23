@@ -296,10 +296,9 @@ class YOLOv1:
             cv2.namedWindow("Object Detection", 0)
             cv2.resizeWindow("Object Detection", self.image_size, self.image_size)
             cv2.imshow("Object Detection", frame)
-            """设置每帧时间"""
             cv2.waitKey(1)
 
-    def preprocess(self, image, cvt_RGB=False):
+    def preprocess(self, image, objects=None, cvt_RGB=True):
         if isinstance(image, str):
             image = cv2.imread(image)
         if cvt_RGB:
@@ -310,7 +309,7 @@ class YOLOv1:
             pre_width, pre_height = int(self.image_size), int(org_height / org_width * self.image_size)
         else:
             pre_width, pre_height = int(org_width / org_height * self.image_size), int(self.image_size)
-        # print(pre_width, pre_height)
+        print(pre_width, pre_height)
         image = cv2.resize(image, (pre_width, pre_height))
         padding_top = int((self.image_size - pre_height) / 2)
         padding_bottom = self.image_size - padding_top - pre_height
@@ -318,4 +317,19 @@ class YOLOv1:
         padding_right = self.image_size - padding_left - pre_width
         image = cv2.copyMakeBorder(image, padding_top, padding_bottom, padding_left, padding_right,
                                    cv2.BORDER_CONSTANT, (0, 0, 0))
+        print(padding_top, padding_bottom, padding_left, padding_right)
+        if objects is not None:
+            for obj in objects:
+                if obj.get("fixed", False):
+                    continue
+                print(obj)
+                obj["x"] = obj["x"] / (org_width - 1) * (pre_width - 1)
+                obj["y"] = obj["y"] / (org_height - 1) * (pre_height - 1)
+                obj["x"] += padding_left
+                obj["y"] += padding_top
+                obj["w"] = obj["w"] / org_width * pre_width
+                obj["h"] = obj["h"] / org_height * pre_height
+                obj["fixed"] = True
+                print(obj)
+
         return image

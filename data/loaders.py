@@ -148,8 +148,8 @@ class VOC2012Loader(DataLoader):
         dom = minidom.parse(path)
 
         size = dom.getElementsByTagName('size')[0]
-        w_abs = eval(size.getElementsByTagName('width')[0].firstChild.data)
-        h_abs = eval(size.getElementsByTagName('height')[0].firstChild.data)
+        # w_abs = eval(size.getElementsByTagName('width')[0].firstChild.data)
+        # h_abs = eval(size.getElementsByTagName('height')[0].firstChild.data)
 
         objects = dom.getElementsByTagName('object')
         for o in objects:
@@ -159,10 +159,10 @@ class VOC2012Loader(DataLoader):
             ymin = eval(box.getElementsByTagName('ymin')[0].firstChild.data)  # [1, height]
             xmax = eval(box.getElementsByTagName('xmax')[0].firstChild.data)  # [1, width]
             ymax = eval(box.getElementsByTagName('ymax')[0].firstChild.data)  # [1, height]
-            x = int(((xmin + xmax) / 2 - 1) / (w_abs - 1) * (448 - 1))  # [0, width-1]
-            y = int(((ymin + ymax) / 2 - 1) / (h_abs - 1) * (448 - 1))  # [0, height-1]
-            w = int((xmax - xmin) / w_abs * 448)
-            h = int((ymax - ymin) / h_abs * 448)
+            x = int(((xmin + xmax) / 2 - 1))  # [0, width-1]
+            y = int(((ymin + ymax) / 2 - 1))  # [0, height-1]
+            w = int((xmax - xmin))
+            h = int((ymax - ymin))
             res.append(dict(name=name, x=x, y=y, w=w, h=h))
         return res
 

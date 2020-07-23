@@ -30,9 +30,9 @@ class Classifier:
             self.device = torch.device("cpu")
         if self.args["model_load_path"] != "":
             self.backbone = torch.load(self.args["model_load_path"])
-        elif self.args["model_type"] in ["", "YOLOv1"]:
+        elif self.args["model_name"] =="yolov1":
             self.backbone = YOLOv1Backbone()
-        elif self.args["model_type"] == "Tiny-YOLOv1":
+        elif self.args["model_name"] == "yolov1-tiny":
             self.backbone = TinyYOLOv1Backbone()
         self.backbone = self.backbone.to(self.device)
 
