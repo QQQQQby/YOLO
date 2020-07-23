@@ -49,14 +49,14 @@ class LocallyConnected2d(nn.Module):
         # Sum in in_channel and kernel_size dims
         w = self.weight.view(*self.weight.size()[:-2], -1).unsqueeze(0)
         # print("w:", w.shape)
-        x = x * w
-        x = x.sum([2, -1])
+        out = x * w
+        out = out.sum([2, -1])
         if self.bias is not None:
             b = self.bias.unsqueeze(0)
             # print("b:", b.shape)
-            x += b
+            out += b
         # print("out:", x.shape)
-        return x
+        return out
 
 
 if __name__ == '__main__':

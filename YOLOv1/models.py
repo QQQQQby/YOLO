@@ -1,6 +1,6 @@
 # coding: utf-8
 
-from util.functions import iou, show_objects, NMS, NMS_multi_process, draw_image
+from util.functions import *
 from util.metrics import determine_TPs, get_AP, get_precision, get_recall
 from YOLOv1.modules import YOLOv1Backbone
 
@@ -43,10 +43,7 @@ class YOLOv1:
         else:
             self.B = 2
 
-    def train(self, batch, do_preprocess=False):
-        if do_preprocess:
-            for data_id in range(len(batch)):
-                batch[data_id][0] = self.preprocess(batch[data_id][0])
+    def train(self, batch):
         self.optimizer.zero_grad()
         loss = self.get_loss(batch)
         loss.backward()
@@ -99,8 +96,8 @@ class YOLOv1:
                 c_label = "c" + str(chosen_bbox_id)
                 loss += self.lambda_coord * ((pred_coord_dict[x_label] - true_dict['x']) ** 2 +
                                              (pred_coord_dict[y_label] - true_dict['y']) ** 2 +
-                                             (pred_coord_dict[w_label] ** 0.5 - true_dict['w'] ** 0.5) ** 2 +
-                                             (pred_coord_dict[h_label] ** 0.5 - true_dict['h'] ** 0.5) ** 2)
+                                             (pred_coord_dict[w_label] - true_dict['w'] ** 0.5) ** 2 +
+                                             (pred_coord_dict[h_label] - true_dict['h'] ** 0.5) ** 2)
                 # print("Coordinate loss =",
                 #       self.lambda_coord * ((pred_coord_dict[x_label] - true_dict['x']) ** 2 +
                 #                            (pred_coord_dict[y_label] - true_dict['y']) ** 2 +
@@ -232,6 +229,9 @@ class YOLOv1:
         return mmAP
 
     def get_output_dict(self, images):
+        for data_id in range(len(images)):
+            if isinstance(images[data_id], str):
+                images[data_id] = self.preprocess(images[data_id], cvt_RGB=True)
         output_tensor = self.backbone(
             torch.from_numpy(np.array(images) / 255.).to(self.device)
         )  # batch_size, 1470 or 1715
@@ -248,21 +248,26 @@ class YOLOv1:
             w_label = "w" + str(bbox_id)
             h_label = "h" + str(bbox_id)
             c_label = "c" + str(bbox_id)
-            output_dict[x_label] = coords[..., bbox_id, 0]
-            output_dict[y_label] = coords[..., bbox_id, 1]
-            output_dict[w_label] = coords[..., bbox_id, 2] ** 2 * self.image_size
-            output_dict[h_label] = coords[..., bbox_id, 3] ** 2 * self.image_size
+            # output_dict[x_label] = coords[..., bbox_id, 0]
+            # output_dict[y_label] = coords[..., bbox_id, 1]
+            output_dict[x_label] = torch.zeros_like(coords[..., bbox_id, 0])
+            output_dict[y_label] = torch.zeros_like(coords[..., bbox_id, 1])
+            output_dict[w_label] = coords[..., bbox_id, 2] ** 2
+            output_dict[w_label] = output_dict[w_label] * self.image_size
+            output_dict[h_label] = coords[..., bbox_id, 3] ** 2
+            output_dict[h_label] = output_dict[h_label] * self.image_size
             output_dict[c_label] = confs[..., bbox_id]
-        output_dict['probs'] = probs
+        output_dict["probs"] = probs
 
         for row in range(self.S):
             for col in range(self.S):
                 for bbox_id in range(self.B):
-                    coords[:, row, col, bbox_id, 0] = (coords[:, row, col, bbox_id, 0] + col) \
-                                                      * ((self.image_size - 1) / self.S)
-                    coords[:, row, col, bbox_id, 1] = (coords[:, row, col, bbox_id, 1] + row) \
-                                                      * ((self.image_size - 1) / self.S)
-
+                    x_label = "x" + str(bbox_id)
+                    y_label = "y" + str(bbox_id)
+                    output_dict[x_label][:, row, col] = (coords[:, row, col, bbox_id, 0] + col) * \
+                                                        ((self.image_size - 1) / self.S)
+                    output_dict[y_label][:, row, col] = (coords[:, row, col, bbox_id, 1] + row) * \
+                                                        ((self.image_size - 1) / self.S)
         return output_dict
 
     def save(self, model_save_path):
@@ -299,4 +304,18 @@ class YOLOv1:
             image = cv2.imread(image)
         if cvt_RGB:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        return cv2.resize(image, (self.image_size, self.image_size)).copy()
+        org_height, org_width = image.shape[:2]
+        """resize"""
+        if org_width > org_height:
+            pre_width, pre_height = int(self.image_size), int(org_height / org_width * self.image_size)
+        else:
+            pre_width, pre_height = int(org_width / org_height * self.image_size), int(self.image_size)
+        # print(pre_width, pre_height)
+        image = cv2.resize(image, (pre_width, pre_height))
+        padding_top = int((self.image_size - pre_height) / 2)
+        padding_bottom = self.image_size - padding_top - pre_height
+        padding_left = int((self.image_size - pre_width) / 2)
+        padding_right = self.image_size - padding_left - pre_width
+        image = cv2.copyMakeBorder(image, padding_top, padding_bottom, padding_left, padding_right,
+                                   cv2.BORDER_CONSTANT, (0, 0, 0))
+        return image

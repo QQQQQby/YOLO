@@ -39,7 +39,8 @@ class VOC2012Loader(DataLoader):
         # file_names = file_names[:2000]
 
         split_index = int(train_prop * len(file_names))
-        self.train_file_names = file_names[:split_index]
+        # self.train_file_names = file_names[:split_index]
+        self.train_file_names = file_names[:]
         # self.eval_file_names = file_names[split_index:]
         self.eval_file_names = file_names[:]
 
@@ -136,9 +137,10 @@ class VOC2012Loader(DataLoader):
 
     @classmethod
     def read_image_array(self, path):
-        array = cv2.imread(path)
-        array = cv2.resize(array, (448, 448))
-        return array[:, :, ::-1]
+        # array = cv2.imread(path)
+        # array = cv2.resize(array, (448, 448))
+        # return array[:, :, ::-1]
+        return path
 
     @classmethod
     def read_objects(cls, path):

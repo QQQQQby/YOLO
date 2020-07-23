@@ -63,33 +63,33 @@ class YOLOv1Backbone(nn.Module):
         """3 * 448 * 448"""
         x = self.conv1(x)
         x = self.batch_norm1(x)
-        x = F.leaky_relu(x, 0.1, inplace=True)
+        x = F.leaky_relu(x, 0.1, inplace=False)
         x = self.pool1(x)
         """64 * 112 * 112"""
         x = self.conv2(x)
         x = self.batch_norm2(x)
-        x = F.leaky_relu(x, 0.1, inplace=True)
+        x = F.leaky_relu(x, 0.1, inplace=False)
         x = self.pool2(x)
         """192 * 56 * 56"""
         for i in range(3, 7):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=True)
+            x = F.leaky_relu(x, 0.1, inplace=False)
         x = self.pool3(x)
         """512 * 28 * 28"""
         for i in range(7, 17):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=True)
+            x = F.leaky_relu(x, 0.1, inplace=False)
         x = self.pool4(x)
         """1024 * 14 * 14"""
         for i in range(17, 25):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=True)
+            x = F.leaky_relu(x, 0.1, inplace=False)
         """1024 * 7 * 7"""
         x = self.local1(x)
-        x = F.leaky_relu(x, 0.1, inplace=True)
+        x = F.leaky_relu(x, 0.1, inplace=False)
         """256 * 7 * 7"""
         x = x.view(-1, 256 * 7 * 7)
         """12544"""
@@ -136,18 +136,19 @@ class TinyYOLOv1Backbone(nn.Module):
 
     def forward(self, x):
         """448 * 448 * 3"""
-        x = x.permute(0, 3, 1, 2).float()
+        x = x.permute(0, 3, 1, 2)
+        x = x.float()
         """3 * 448 * 448"""
         for i in range(1, 7):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=True)
+            x = F.leaky_relu(x, 0.1, inplace=False)
             x = getattr(self, 'pool%d' % i)(x)
         """512 * 28 * 28"""
         for i in range(7, 9):
             x = getattr(self, 'conv%d' % i)(x)
             x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=True)
+            x = F.leaky_relu(x, 0.1, inplace=False)
         """256 * 7 * 7"""
         x = x.view(-1, 256 * 7 * 7)
         """25088"""
