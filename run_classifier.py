@@ -71,11 +71,11 @@ class Classifier:
 
         print('-' * 20 + 'Preprocessing data' + '-' * 20, flush=True)
         for data_id in range(len(data_train)):
-            data_train[data_id][0] = self.model.preprocess_image(*(data_train[data_id]), cvt_RGB=True)
+            data_train[data_id][0] = self.model.preprocess_image(*(data_train[data_id]), cvt_RGB=True)[0]
         for data_id in range(len(data_eval)):
-            data_eval[data_id][0] = self.model.preprocess_image(*(data_eval[data_id]), cvt_RGB=True)
+            data_eval[data_id][0] = self.model.preprocess_image(*(data_eval[data_id]), cvt_RGB=True)[0]
         for data_id in range(len(data_test)):
-            data_test[data_id][0] = self.model.preprocess_image(*(data_test[data_id]), cvt_RGB=True)
+            data_test[data_id][0] = self.model.preprocess_image(*(data_test[data_id]), cvt_RGB=True)[0]
 
         if self.args["graph_save_dir"] != "":
             self.model.save_graph(self.args["graph_save_dir"])

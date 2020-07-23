@@ -36,16 +36,17 @@ def draw_image(image_array: np.ndarray, objects, color_dict):
         lower_right = (int(o['x'] + o['w'] / 2), int(o['y'] + o['h'] / 2))
         cv2.rectangle(image, upper_left, lower_right, color_dict[o['name']][::-1], 2)
         # cv2.rectangle(image, upper_left, lower_right, (255, 0, 0)[::-1], 1)
+    for o in objects:
+        upper_left = (int(o['x'] - o['w'] / 2), int(o['y'] - o['h'] / 2))
         cv2.rectangle(
             image,
             upper_left,
-            (upper_left[0] + len(o['name'] * 8), max(upper_left[1] - 12, 16)),
+            (upper_left[0] + len(o['name'] * 10), max(upper_left[1] - 16, 0)),
             color_dict[o['name']][::-1],
             -1
         )
-
         upper_left = (upper_left[0] + 2, max(upper_left[1] - 4, 12))
-        cv2.putText(image, o['name'], upper_left, cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255)[::-1], 1)
+        cv2.putText(image, o['name'], upper_left, cv2.FONT_HERSHEY_TRIPLEX, 0.4, (255, 255, 255)[::-1], 1)
     return image
 
 

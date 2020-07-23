@@ -256,10 +256,11 @@ class YOLOv1:
             writer.add_graph(self.backbone, [torch.rand(1, self.image_size, self.image_size, 3)])
 
     def detect_image_and_show(self, image_path, color_dict, delay):
-        im = self.preprocess_image(image_path, cvt_RGB=True)
-        pred_results = self.predict([im], num_processes=0)
+        im, unresized_im, paddings = self.preprocess_image(image_path, cvt_RGB=True)
+        pred_results = self.predict([im], num_processes=0)[0]
+        pred_results = self.unpreprocess_objects(pred_results, unresized_im.shape, paddings)
         print(pred_results)
-        show_objects(im, pred_results[0], color_dict, delay)
+        show_objects(unresized_im, pred_results, color_dict, delay)
 
     def detect_video_and_show(self, video_path, color_dict):
         if video_path == "0":
@@ -268,12 +269,13 @@ class YOLOv1:
             capture = cv2.VideoCapture(video_path)
         while capture.isOpened():
             ret, frame = capture.read()
-            # frame = cv2.rotate(frame, 0)
-            frame = self.preprocess_image(frame, cvt_RGB=True)
-            frame = draw_image(frame, self.predict([frame], num_processes=0)[0], color_dict)
+            frame, unresized_frame, paddings = self.preprocess_image(frame, cvt_RGB=True)
+            pred_results = self.predict([frame], num_processes=0)[0]
+            pred_results = self.unpreprocess_objects(pred_results, unresized_frame.shape, paddings)
+            unresized_frame = draw_image(unresized_frame, pred_results, color_dict)
             cv2.namedWindow("Object Detection", 0)
-            cv2.resizeWindow("Object Detection", self.image_size, self.image_size)
-            cv2.imshow("Object Detection", frame)
+            cv2.resizeWindow("Object Detection", unresized_frame.shape[1], unresized_frame.shape[0])
+            cv2.imshow("Object Detection", unresized_frame)
             cv2.waitKey(1)
 
     def preprocess_image(self, image, objects=None, cvt_RGB=True):
@@ -288,19 +290,20 @@ class YOLOv1:
         else:
             pre_width, pre_height = int(org_width / org_height * self.image_size), int(self.image_size)
         # print(pre_width, pre_height)
-        image = cv2.resize(image, (pre_width, pre_height))
         padding_top = int((self.image_size - pre_height) / 2)
         padding_bottom = self.image_size - padding_top - pre_height
         padding_left = int((self.image_size - pre_width) / 2)
         padding_right = self.image_size - padding_left - pre_width
+        unresized_image = image
+        image = image.copy()
+        image = cv2.resize(image, (pre_width, pre_height))
         image = cv2.copyMakeBorder(image, padding_top, padding_bottom, padding_left, padding_right,
                                    cv2.BORDER_CONSTANT, (0, 0, 0))
-        # print(padding_top, padding_bottom, padding_left, padding_right)
+
         if objects is not None:
             for obj in objects:
                 if obj.get("fixed", False):
                     continue
-                # print(obj)
                 obj["x"] = obj["x"] / (org_width - 1) * (pre_width - 1)
                 obj["y"] = obj["y"] / (org_height - 1) * (pre_height - 1)
                 obj["x"] += padding_left
@@ -308,8 +311,17 @@ class YOLOv1:
                 obj["w"] = obj["w"] / org_width * pre_width
                 obj["h"] = obj["h"] / org_height * pre_height
                 obj["fixed"] = True
-                # print(obj)
 
-        return image
+        return image, unresized_image, (padding_top, padding_bottom, padding_left, padding_right)
 
-    # def preprocess_objects
+    def unpreprocess_objects(self, objects, org_shape, paddings):
+        prop = max(org_shape[:2]) / self.image_size
+        for obj in objects:
+            obj["x"] -= paddings[2]
+            obj["y"] -= paddings[0]
+            obj["x"] *= prop
+            obj["y"] *= prop
+            obj["w"] *= prop
+            obj["h"] *= prop
+            obj["fixed"] = False
+        return objects
