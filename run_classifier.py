@@ -30,7 +30,7 @@ class Classifier:
             self.device = torch.device("cpu")
         if self.args["model_load_path"] != "":
             self.backbone = torch.load(self.args["model_load_path"])
-        elif self.args["model_name"] =="yolov1":
+        elif self.args["model_name"] == "yolov1":
             self.backbone = YOLOv1Backbone()
         elif self.args["model_name"] == "yolov1-tiny":
             self.backbone = TinyYOLOv1Backbone()
@@ -65,9 +65,18 @@ class Classifier:
             return None
 
         print('-' * 20 + 'Reading data' + '-' * 20, flush=True)
-        data_train = self.data_loader.get_data_train() if self.args["do_train"] else None
-        data_eval = self.data_loader.get_data_eval() if self.args["do_eval"] else None
-        data_test = self.data_loader.get_data_test() if self.args["do_test"] else None
+        data_train = self.data_loader.get_data_train() if self.args["do_train"] else []
+        data_eval = self.data_loader.get_data_eval() if self.args["do_eval"] else []
+        data_test = self.data_loader.get_data_test() if self.args["do_test"] else []
+
+        print('-' * 20 + 'Preprocessing data' + '-' * 20, flush=True)
+        for data_id in range(len(data_train)):
+            data_train[data_id][0] = self.model.preprocess_image(*(data_train[data_id]), cvt_RGB=True)
+        for data_id in range(len(data_eval)):
+            data_eval[data_id][0] = self.model.preprocess_image(*(data_eval[data_id]), cvt_RGB=True)
+        for data_id in range(len(data_test)):
+            data_test[data_id][0] = self.model.preprocess_image(*(data_test[data_id]), cvt_RGB=True)
+
         if self.args["graph_save_dir"] != "":
             self.model.save_graph(self.args["graph_save_dir"])
         for epoch in range(self.args["num_epochs"]):

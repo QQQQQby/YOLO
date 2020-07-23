@@ -40,7 +40,7 @@ class VOC2012Loader(DataLoader):
 
         split_index = int(train_prop * len(file_names))
         # self.train_file_names = file_names[:split_index]
-        self.train_file_names = file_names[:]
+        self.train_file_names = file_names[:50]
         # self.eval_file_names = file_names[split_index:]
         self.eval_file_names = file_names[:]
 
@@ -51,8 +51,8 @@ class VOC2012Loader(DataLoader):
         image_object_paths = []
         for name in self.train_file_names:
             image_object_paths.append(
-                (os.path.join(self.get_path(), "VOC2012", "train", "JPEGImages", name + '.jpg'),
-                 os.path.join(self.get_path(), "VOC2012", "train", "Annotations", name + '.xml'))
+                [os.path.join(self.get_path(), "VOC2012", "train", "JPEGImages", name + '.jpg'),
+                 os.path.join(self.get_path(), "VOC2012", "train", "Annotations", name + '.xml')]
             )
         res = []
         process_bar = tqdm(range(len(self.train_file_names)))
@@ -130,10 +130,10 @@ class VOC2012Loader(DataLoader):
                        "bottle", "chair", "diningtable", "pottedplant", "sofa", "tvmonitor"])
 
     def read_image_and_objects(self, image_object_path):
-        return (
+        return [
             self.read_image_array(image_object_path[0]),
             self.read_objects(image_object_path[1])
-        )
+        ]
 
     @classmethod
     def read_image_array(self, path):

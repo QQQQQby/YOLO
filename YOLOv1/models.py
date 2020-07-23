@@ -112,7 +112,7 @@ class YOLOv1:
                     loss += self.lambda_noobj * (output_dict[c_label][data_id, row, col] - 0) ** 2
                 """概率损失"""
                 prob_loss = nn.MSELoss(reduction="sum")
-                true_porbs = torch.zeros((self.num_classes))
+                true_porbs = torch.zeros(self.num_classes)
                 true_porbs[self.labels.index(true_dict['name'])] = 1
                 # print("Prob loss =", prob_loss(output_dict['probs'][data_id, row, col], true_porbs))
                 loss += prob_loss(
@@ -152,28 +152,6 @@ class YOLOv1:
             )
             p.close()
             p.join()
-            # results = [[] for i in range(len(images))]
-            #
-            # num_images_per_thread = (len(images)-1)//num_threads+1
-            # num_threads = (len(images)-1)//num_images_per_thread+1
-            # image_id_slices = []
-            # for thread_id in range(num_threads):
-            #     image_id_slices.append(list(range(
-            #         thread_id*num_images_per_thread,
-            #         min((thread_id+1)*num_images_per_thread, len(images))
-            #     )))
-            # print(image_id_slices)
-            #
-            # thread_pool = []
-            # for thread_id in range(num_threads):
-            #     thread_pool.append(threading.Thread(
-            #         target=NMS_multi_images,
-            #         args=(results, output_dict, image_id_slices[thread_id], self.labels, self.score_threshold, self.iou_threshold)
-            #     ))
-            # for thread_id in range(num_threads):
-            #     thread_pool[thread_id].start()
-            # for thread_id in range(num_threads):
-            #     thread_pool[thread_id].join()
         # b = time.time()
         # print(b - a, "s")
         return results
@@ -184,8 +162,11 @@ class YOLOv1:
         gt_dict = {}
         dt_dict = {}
         for category in self.labels:
-            gt_dict[category] = [[] for i in range(len(batch))]
-            dt_dict[category] = [[] for i in range(len(batch))]
+            gt_dict[category] = []
+            dt_dict[category] = []
+            for i in range(len(batch)):
+                gt_dict[category].append([])
+                dt_dict[category].append([])
         for data_id in range(len(batch)):
             gt_list = batch[data_id][1]
             for gt in gt_list:
@@ -229,9 +210,6 @@ class YOLOv1:
         return mmAP
 
     def get_output_dict(self, images):
-        for data_id in range(len(images)):
-            if isinstance(images[data_id], str):
-                images[data_id] = self.preprocess(images[data_id], cvt_RGB=True)
         output_tensor = self.backbone(
             torch.from_numpy(np.array(images) / 255.).to(self.device)
         )  # batch_size, 1470 or 1715
@@ -278,7 +256,7 @@ class YOLOv1:
             writer.add_graph(self.backbone, [torch.rand(1, self.image_size, self.image_size, 3)])
 
     def detect_image_and_show(self, image_path, color_dict, delay):
-        im = self.preprocess(image_path, cvt_RGB=True)
+        im = self.preprocess_image(image_path, cvt_RGB=True)
         pred_results = self.predict([im], num_processes=0)
         print(pred_results)
         show_objects(im, pred_results[0], color_dict, delay)
@@ -291,14 +269,14 @@ class YOLOv1:
         while capture.isOpened():
             ret, frame = capture.read()
             # frame = cv2.rotate(frame, 0)
-            frame = self.preprocess(frame, cvt_RGB=True)
+            frame = self.preprocess_image(frame, cvt_RGB=True)
             frame = draw_image(frame, self.predict([frame], num_processes=0)[0], color_dict)
             cv2.namedWindow("Object Detection", 0)
             cv2.resizeWindow("Object Detection", self.image_size, self.image_size)
             cv2.imshow("Object Detection", frame)
             cv2.waitKey(1)
 
-    def preprocess(self, image, objects=None, cvt_RGB=True):
+    def preprocess_image(self, image, objects=None, cvt_RGB=True):
         if isinstance(image, str):
             image = cv2.imread(image)
         if cvt_RGB:
@@ -309,7 +287,7 @@ class YOLOv1:
             pre_width, pre_height = int(self.image_size), int(org_height / org_width * self.image_size)
         else:
             pre_width, pre_height = int(org_width / org_height * self.image_size), int(self.image_size)
-        print(pre_width, pre_height)
+        # print(pre_width, pre_height)
         image = cv2.resize(image, (pre_width, pre_height))
         padding_top = int((self.image_size - pre_height) / 2)
         padding_bottom = self.image_size - padding_top - pre_height
@@ -317,12 +295,12 @@ class YOLOv1:
         padding_right = self.image_size - padding_left - pre_width
         image = cv2.copyMakeBorder(image, padding_top, padding_bottom, padding_left, padding_right,
                                    cv2.BORDER_CONSTANT, (0, 0, 0))
-        print(padding_top, padding_bottom, padding_left, padding_right)
+        # print(padding_top, padding_bottom, padding_left, padding_right)
         if objects is not None:
             for obj in objects:
                 if obj.get("fixed", False):
                     continue
-                print(obj)
+                # print(obj)
                 obj["x"] = obj["x"] / (org_width - 1) * (pre_width - 1)
                 obj["y"] = obj["y"] / (org_height - 1) * (pre_height - 1)
                 obj["x"] += padding_left
@@ -330,6 +308,8 @@ class YOLOv1:
                 obj["w"] = obj["w"] / org_width * pre_width
                 obj["h"] = obj["h"] / org_height * pre_height
                 obj["fixed"] = True
-                print(obj)
+                # print(obj)
 
         return image
+
+    # def preprocess_objects
