@@ -29,27 +29,33 @@ class DataLoader:
 
 
 class VOCDataLoader(DataLoader):
-    def __init__(self, path, train_prop=0.8, num_processes=4, do_shuffle=False, preload=True):
+    def __init__(self, path, train_prop=0.8, num_processes=0, do_shuffle=False, preload=True):
         super(VOCDataLoader, self).__init__(path)
-        file_names = os.listdir(os.path.join(self.get_path(), "JPEGImages"))
-        if sorted(file_names) == sorted(os.listdir(os.path.join(self.get_path(), "Annotations"))):
+        image_file_names = sorted(os.listdir(os.path.join(self.get_path(), "JPEGImages")))
+        image_file_names = [name[:-4] for name in image_file_names]
+        annotation_file_names = sorted(os.listdir(os.path.join(self.get_path(), "Annotations")))
+        annotation_file_names = [name[:-4] for name in annotation_file_names]
+
+        if image_file_names != annotation_file_names:
             # Make sure every image has a corresponding annotation file.
             print("Warning: Incomplete dataset.")
-        file_names = [name.replace('.jpg', '') for name in file_names]
         if do_shuffle:
-            random.shuffle(file_names)
+            random.shuffle(image_file_names)
 
-        split_index = int(train_prop * len(file_names))
-        # self.train_file_names = file_names[:split_index]
-        self.train_file_names = file_names[:split_index]
-        # self.eval_file_names = file_names[split_index:]
-        self.eval_file_names = file_names[split_index:]
+        split_index = int(train_prop * len(image_file_names))
+        # self.train_file_names = image_file_names[:split_index]
+        self.train_file_names = image_file_names[:split_index]
+        # self.eval_file_names = image_file_names[split_index:]
+        self.eval_file_names = image_file_names[split_index:]
 
         self.num_processes = num_processes
         self.preload = preload
 
         self.data_train = None
         self.data_eval = None
+
+    def get_all_data(self):
+        return self.get_data_train() + self.get_data_eval()
 
     def get_data_train(self):
         """Use multiprocessing to read data"""
@@ -63,11 +69,17 @@ class VOCDataLoader(DataLoader):
             )
         res = []
         process_bar = tqdm(range(len(self.train_file_names)))
-        with Pool(self.num_processes) as p:
-            for data in p.imap(self.read_image_and_objects, image_object_paths):
-                res.append(data)
+        if self.num_processes == 0:
+            for paths in image_object_paths:
+                # print(paths)
+                res.append(self.read_image_and_objects(paths))
                 process_bar.update()
-            p.close()
+        else:
+            with Pool(self.num_processes) as p:
+                for data in p.imap(self.read_image_and_objects, image_object_paths):
+                    res.append(data)
+                    process_bar.update()
+                p.close()
         process_bar.close()
         self.data_train = res
         return res
@@ -83,11 +95,17 @@ class VOCDataLoader(DataLoader):
             )
         res = []
         process_bar = tqdm(range(len(self.eval_file_names)))
-        with Pool(self.num_processes) as p:
-            for data in p.imap(self.read_image_and_objects, image_object_paths):
-                res.append(data)
+        if self.num_processes == 0:
+            for paths in image_object_paths:
+                # print(paths)
+                res.append(self.read_image_and_objects(paths))
                 process_bar.update()
-            p.close()
+        else:
+            with Pool(self.num_processes) as p:
+                for data in p.imap(self.read_image_and_objects, image_object_paths):
+                    res.append(data)
+                    process_bar.update()
+                p.close()
         process_bar.close()
         self.data_eval = res
         return res
@@ -128,10 +146,15 @@ class VOCDataLoader(DataLoader):
         return res
 
 
-def read_classes(path):
+def read_classes_and_colors(path):
     with open(path, "r") as f:
-        labels = f.read().strip().split("\n")
-    return labels
+        text = f.read().strip().split("\n")
+    labels, colors = [], {}
+    for line in text:
+        line = line.split()
+        labels.append(line[0])
+        colors[line[0]] = tuple(map(int, line[1:]))
+    return labels, colors
 
 
 if __name__ == '__main__':

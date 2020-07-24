@@ -7,7 +7,7 @@ from tqdm import tqdm
 import time
 
 from YOLOv1.modules import YOLOv1Backbone, TinyYOLOv1Backbone
-from util.loaders import VOCDataLoader, read_classes
+from util.loaders import VOCDataLoader, read_classes_and_colors
 from YOLOv1.models import YOLOv1
 from args import get_args
 
@@ -40,9 +40,9 @@ class Classifier:
         if self.args["dataset_path"] != "":
             self.data_loader = VOCDataLoader(self.args["dataset_path"], num_processes=4, preload=self.args["preload"])
         if self.args["class_path"] == "":
-            self.classes = read_classes("data/voc2012.names")
+            self.classes, self.color_dict = read_classes_and_colors("data/voc2012.classes")
         else:
-            self.classes = read_classes(self.args["class_path"])
+            self.classes,self.color_dict = read_classes_and_colors(self.args["class_path"])
 
         if self.args["model_save_dir"] != "" and not os.path.exists(self.args["model_save_dir"]):
             os.makedirs(self.args["model_save_dir"])
@@ -60,14 +60,14 @@ class Classifier:
         if self.args["image_detect_path"] != "":
             self.model.detect_image_and_show(
                 self.args["image_detect_path"],
-                self.args["colors"],
+                self.color_dict,
                 0
             )
 
         if self.args["video_detect_path"] != "":
             self.model.detect_video_and_show(
                 self.args["video_detect_path"],
-                self.args["colors"],
+                self.color_dict,
             )
         if not any([self.args["do_train"], self.args["do_eval"], self.args["do_test"]]):
             return None

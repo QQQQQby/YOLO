@@ -39,12 +39,15 @@ And there are some other optional arguments:
                         perform.
   --dataset_path DATASET_PATH
                         Dataset path.
+  --preload             Whether to preload the dataset.
   --model_load_path MODEL_LOAD_PATH
                         Input path for models.
   --model_name {yolov1,yolov1-tiny}
                         Model type. optional models: yolov1(default),
                         yolov1-tiny. Not required when the loading path of the
                         model is specified.
+  --class_path CLASS_PATH
+                        Path for a file to store names and colors of the classes.
   --graph_save_dir GRAPH_SAVE_DIR
                         Output directory for the graph of the model. If empty,
                         graph will not be saved.

@@ -2,30 +2,6 @@
 
 import argparse
 
-color_dict = {
-    "person": (255, 0, 0),
-    "bird": (112, 128, 105),
-    "cat": (56, 94, 15),
-    "cow": (8, 46, 84),
-    "dog": (210, 105, 30),
-    "horse": (128, 42, 42),
-    "sheep": (255, 0, 250),
-    "aeroplane": (0, 255, 255),
-    "bicycle": (255, 0, 100),
-    "boat": (210, 180, 140),
-    "bus": (220, 220, 220),
-    "car": (0, 0, 255),
-    "motorbike": (200, 0, 200),
-    "train": (127, 255, 212),
-    "bottle": (51, 161, 201),
-    "chair": (139, 69, 19),
-    "diningtable": (115, 74, 18),
-    "pottedplant": (46, 139, 87),
-    "sofa": (160, 32, 240),
-    "tvmonitor": (65, 105, 225)
-}
-
-
 def parse_args():
     parser = argparse.ArgumentParser(description="Run MNIST Classifier.")
     parser.add_argument('--image_detect_path', type=str, default='',
@@ -47,7 +23,7 @@ def parse_args():
                              'Not required when the loading path of the model is specified.',
                         choices=["yolov1", "yolov1-tiny"])
     parser.add_argument('--class_path', type=str, default='',
-                        help='Path for a file to store names of the classes.')
+                        help='Path for a file to store names and colors of the classes.')
 
     parser.add_argument('--graph_save_dir', type=str, default='',
                         help='Output directory for the graph of the model. '
@@ -98,5 +74,4 @@ def parse_args():
 
 def get_args():
     arg_dict = parse_args()
-    arg_dict["colors"] = color_dict
     return arg_dict
