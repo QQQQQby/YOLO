@@ -36,14 +36,18 @@ def parse_args():
                              'If zero, OpenCV will predict through camera. '
                              'If empty, the detection will not perform.')
 
-    parser.add_argument('--dataset_path', type=str, default='G:/DataSets',
+    parser.add_argument('--dataset_path', type=str, default='',
                         help='Dataset path.')
+    parser.add_argument('--preload', action='store_true', default=False,
+                        help="Whether to preload the dataset.")
     parser.add_argument('--model_load_path', type=str, default='',
                         help='Input path for models.')
     parser.add_argument('--model_name', type=str, default='yolov1',
                         help='Model type. optional models: yolov1(default), yolov1-tiny. '
                              'Not required when the loading path of the model is specified.',
                         choices=["yolov1", "yolov1-tiny"])
+    parser.add_argument('--class_path', type=str, default='',
+                        help='Path for a file to store names of the classes.')
 
     parser.add_argument('--graph_save_dir', type=str, default='',
                         help='Output directory for the graph of the model. '

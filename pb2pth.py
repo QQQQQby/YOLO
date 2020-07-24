@@ -161,7 +161,7 @@ if __name__ == '__main__':
 
         # torch.save(pth_model, save_path)
         """validate"""
-        inp = cv2.imread("image_samples/dog.jpg").copy()
+        inp = cv2.imread("data/dog.jpg").copy()
         inp = inp[:, :, ::-1]
         inp = inp / 255.
         inp = inp.copy()

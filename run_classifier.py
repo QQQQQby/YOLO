@@ -7,7 +7,7 @@ from tqdm import tqdm
 import time
 
 from YOLOv1.modules import YOLOv1Backbone, TinyYOLOv1Backbone
-from data.loaders import VOC2012Loader
+from util.loaders import VOCDataLoader, read_classes
 from YOLOv1.models import YOLOv1
 from args import get_args
 
@@ -20,21 +20,29 @@ class Classifier:
         print("}")
         self.args = args.copy()
 
-        self.data_loader = VOC2012Loader(self.args["dataset_path"], num_processes=4)
-        self.labels = self.data_loader.get_labels()
-
         if self.args["use_cuda"] and torch.cuda.is_available():
             self.device = torch.device("cuda")
             torch.set_default_tensor_type('torch.cuda.FloatTensor')
         else:
             self.device = torch.device("cpu")
+
         if self.args["model_load_path"] != "":
             self.backbone = torch.load(self.args["model_load_path"])
-        elif self.args["model_name"] == "yolov1":
-            self.backbone = YOLOv1Backbone()
-        elif self.args["model_name"] == "yolov1-tiny":
-            self.backbone = TinyYOLOv1Backbone()
+        else:
+            if self.args["model_name"] == "yolov1":
+                self.backbone = YOLOv1Backbone()
+            elif self.args["model_name"] == "yolov1-tiny":
+                self.backbone = TinyYOLOv1Backbone()
+            for layer_key in self.backbone.state_dict():
+                torch.nn.init.zeros_(self.backbone.state_dict()[layer_key])
         self.backbone = self.backbone.to(self.device)
+
+        if self.args["dataset_path"] != "":
+            self.data_loader = VOCDataLoader(self.args["dataset_path"], num_processes=4, preload=self.args["preload"])
+        if self.args["class_path"] == "":
+            self.classes = read_classes("data/voc2012.names")
+        else:
+            self.classes = read_classes(self.args["class_path"])
 
         if self.args["model_save_dir"] != "" and not os.path.exists(self.args["model_save_dir"]):
             os.makedirs(self.args["model_save_dir"])
@@ -44,7 +52,7 @@ class Classifier:
         self.model = YOLOv1(
             self.backbone,
             self.device,
-            self.labels,
+            self.classes,
             self.args
         )
 

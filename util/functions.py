@@ -50,9 +50,9 @@ def draw_image(image_array: np.ndarray, objects, color_dict):
     return image
 
 
-def NMS(output_dict, image_id, model):
+def NMS(output_dict, image_id, model, classes):
     results = []
-    for category in model.labels:
+    for class_name in classes:
         candidates = []
         for row in range(model.S):
             for col in range(model.S):
@@ -63,10 +63,10 @@ def NMS(output_dict, image_id, model):
                     h_label = "h" + str(bbox_id)
                     c_label = "c" + str(bbox_id)
                     score = float(output_dict[c_label][image_id, row, col] *
-                                  output_dict["probs"][image_id, row, col, model.labels.index(category)])
+                                  output_dict["probs"][image_id, row, col, model.classes.index(class_name)])
                     if score >= model.score_threshold:
                         candidates.append({
-                            "name": category,
+                            "name": class_name,
                             "score": score,
                             "x": float(output_dict[x_label][image_id, row, col]),
                             "y": float(output_dict[y_label][image_id, row, col]),
@@ -94,5 +94,5 @@ def NMS(output_dict, image_id, model):
 
 
 def NMS_multi_process(inp):
-    # output_dict, image_id, labels, score_threshold, iou_threshold
+    # output_dict, image_id, classes, score_threshold, iou_threshold
     return NMS(*inp)

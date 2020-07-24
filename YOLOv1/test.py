@@ -11,7 +11,7 @@ import os
 
 from YOLOv1.modules import YOLOv1Backbone
 from YOLOv1.models import YOLOv1
-from data.loaders import VOC2012Loader
+from data.loaders import VOCDataLoader
 from util.functions import show_objects
 from util.metrics import get_AP
 

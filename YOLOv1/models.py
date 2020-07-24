@@ -16,18 +16,18 @@ import threading
 
 
 class YOLOv1:
-    def __init__(self, backbone, device, labels, args):
+    def __init__(self, backbone, device, classes, args):
         self.backbone = backbone
         self.device = device
-        self.labels = labels
+        self.classes = classes
 
         self.lr = args["lr"]
         self.momentum = args["momentum"]
         self.lambda_coord = args["lambda_coord"]
         self.lambda_noobj = args["lambda_noobj"]
 
-        self.optimizer = optim.SGD(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
-        # self.optimizer = optim.Adam(self.backbone.parameters(), lr=self.lr)
+        # self.optimizer = optim.SGD(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
+        self.optimizer = optim.Adam(self.backbone.parameters(), lr=self.lr)
         # self.optimizer = optim.(self.backbone.parameters(), lr=self.lr, momentum=self.momentum)
 
         self.clip_max_norm = args["clip_max_norm"]
@@ -35,7 +35,7 @@ class YOLOv1:
         self.iou_threshold = args["iou_threshold"]
         self.iou_thresholds_mmAP = args["iou_thresholds_mmAP"]
 
-        self.num_classes = len(labels)
+        self.num_classes = len(classes)
         self.image_size = 448
         self.S = 7
         if isinstance(backbone, YOLOv1Backbone):
@@ -113,7 +113,7 @@ class YOLOv1:
                 """概率损失"""
                 prob_loss = nn.MSELoss(reduction="sum")
                 true_porbs = torch.zeros(self.num_classes)
-                true_porbs[self.labels.index(true_dict['name'])] = 1
+                true_porbs[self.classes.index(true_dict['name'])] = 1
                 # print("Prob loss =", prob_loss(output_dict['probs'][data_id, row, col], true_porbs))
                 loss += prob_loss(
                     output_dict['probs'][data_id, row, col],
@@ -140,7 +140,7 @@ class YOLOv1:
         if num_processes == 0:
             results = []
             for image_id in range(len(images)):
-                results.append(NMS(output_dict, image_id, self))
+                results.append(NMS(output_dict, image_id, self ,self.classes))
         else:
             p = Pool(num_processes)
             inputs = []
@@ -161,12 +161,12 @@ class YOLOv1:
             pred_results = self.predict([data[0] for data in batch])
         gt_dict = {}
         dt_dict = {}
-        for category in self.labels:
-            gt_dict[category] = []
-            dt_dict[category] = []
+        for class_name in self.classes:
+            gt_dict[class_name] = []
+            dt_dict[class_name] = []
             for i in range(len(batch)):
-                gt_dict[category].append([])
-                dt_dict[category].append([])
+                gt_dict[class_name].append([])
+                dt_dict[class_name].append([])
         for data_id in range(len(batch)):
             gt_list = batch[data_id][1]
             for gt in gt_list:
@@ -178,17 +178,17 @@ class YOLOv1:
         mAPs = []
         for threshold in self.iou_thresholds_mmAP:
             APs = []
-            for category in self.labels:
+            for class_name in self.classes:
                 are_tps = []
                 for data_id in range(len(batch)):
-                    dts = dt_dict[category][data_id]
-                    gts = gt_dict[category][data_id]
+                    dts = dt_dict[class_name][data_id]
+                    gts = gt_dict[class_name][data_id]
                     are_tps.append(determine_TPs(dts, gts, threshold))
                 detections = []
                 fn = 0
                 for data_id in range(len(batch)):
-                    fn += len(gt_dict[category][data_id])
-                    for index, dt in enumerate(dt_dict[category][data_id]):
+                    fn += len(gt_dict[class_name][data_id])
+                    for index, dt in enumerate(dt_dict[class_name][data_id]):
                         detections.append((data_id, dt, are_tps[data_id][index]))
                 detections.sort(key=lambda x: -x[1]["score"])
                 precisions, recalls = [], []
@@ -204,7 +204,7 @@ class YOLOv1:
                 # plt.plot(recalls, precisions)
                 # plt.show()
                 APs.append(get_AP(precisions, recalls))
-                # print("AP of", category, "=", get_AP(precisions, recalls))
+                # print("AP of", class_name, "=", get_AP(precisions, recalls))
             mAPs.append(sum(APs) / len(APs))
         mmAP = sum(mAPs) / len(mAPs)
         return mmAP
