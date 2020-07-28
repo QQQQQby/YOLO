@@ -10,22 +10,18 @@ from multiprocessing import Pool
 
 from YOLOv1.modules import TinyYOLOv1Backbone, YOLOv1Backbone
 
-np.random.seed(520)
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Transform Tensorflow weights(.pb) to Pytorch weights(.pth).")
     parser.add_argument('--load_path', type=str, default='',
-                        help='Save path for Tensorflow weights(.pb).')
+                        help='Save path for Tensorflow weights(.pb or .ckpt).')
     parser.add_argument('--save_path', type=str, default='',
                         help='Save path for Pytorch weights(.pth).')
     parser.add_argument('--model_name', type=str, default='',
-                        help='Name of the model. '
-                             'Optional: yolov1, yolov1-tiny.')
-    parser.add_argument('--num_processes', type=int, default=0,
-                        help='Number of processes. '
-                             'If zero, multiprocessing will not be used.')
+                        help='Name of the model. ',
+                        choices=["yolov1", "yolov1-tiny", "yolov3"])
     return parser.parse_args().__dict__
 
 
@@ -39,24 +35,27 @@ if __name__ == '__main__':
     args = parse_args()
     load_path = args["load_path"]
     save_path = args["save_path"]
-    model_name = args["model_name"].lower()
-    num_processes = args["num_processes"]
-    if load_path == "" or save_path == "" or model_name == "":
+    model_name = args["model_name"]
+    if load_path == "" or save_path == "":
         exit(-1)
 
     with tf.Session() as sess:
         """load model"""
-        with gfile.FastGFile(load_path, 'rb') as f:
-            graph_def = tf.GraphDef()
-            graph_def.ParseFromString(f.read())
-            sess.graph.as_default()
-            tf.import_graph_def(graph_def, name='')
-        sess.run(tf.global_variables_initializer())
+        if load_path.endswith(".pb"):
+            with gfile.FastGFile(load_path, 'rb') as f:
+                graph_def = tf.GraphDef()
+                graph_def.ParseFromString(f.read())
+                sess.graph.as_default()
+                tf.import_graph_def(graph_def, name='')
+        elif load_path.endswith(".ckpt"):
+            load_dir = os.path.dirname(load_path)
+            saver = tf.train.import_meta_graph(load_path+".meta")
+            saver.restore(sess, tf.train.latest_checkpoint(load_dir))
 
         """display the model with tensorboard"""
-        # summary_writer = tf.summary.FileWriter('log/')
-        # summary_writer.add_graph(sess.graph)
-        # summary_writer.close()
+        summary_writer = tf.summary.FileWriter('log/')
+        summary_writer.add_graph(sess.graph)
+        summary_writer.close()
 
         """output shape of each layer"""
         inp = np.random.random([1, 448, 448, 3])
@@ -66,7 +65,9 @@ if __name__ == '__main__':
                 ops.pop(i)
         for op in ops:
             print(op.name)
-            print(op.outputs[0].shape)
+            # print(op.outputs[0].shape)
+
+        print(sess.run(ops[8].outputs[0]))
 
         """extract weights and biases"""
         if model_name == "yolov1-tiny":
@@ -87,13 +88,6 @@ if __name__ == '__main__':
             bn_betas = [i + 2 for i in bn_gammas]
             fc_weights = [690]
             fc_biases = [691]
-            # conv_weights = []
-            # bn_means = []
-            # bn_stds = []
-            # bn_gammas = []
-            # bn_betas = []
-            # fc_weights = []
-            # fc_biases = []
             local2d_weights = [[371, 377, 383, 389, 395, 401, 407,
                                 415, 421, 427, 433, 439, 445, 451,
                                 459, 465, 471, 477, 483, 489, 495,
@@ -102,6 +96,8 @@ if __name__ == '__main__':
                                 591, 597, 603, 609, 615, 621, 627,
                                 635, 641, 647, 653, 659, 665, 671]]
             local2d_sizes = [7]
+        elif model_name == "yolov3":
+            pass
 
         print("Extracting weights... ", end="", flush=True)
         start_time = time.time()
@@ -204,6 +200,5 @@ if __name__ == '__main__':
             outputs_pth['fc1'].detach().numpy() -
             tff("output:0")
         )
-        print([[-3.1515956e-06, 7.7709556e-06, -1.6540289e-06, 8.5234642e-06, 6.6757202e-06, -5.9604645e-08]])
 
         print()

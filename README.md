@@ -82,3 +82,20 @@ And there are some other optional arguments:
   --test_batch_size TEST_BATCH_SIZE
                         Batch size of test set.
 ```
+
+## Transform .weights to .pth
+
+We firstly use `.weights` and `.cfg` files to generate and save a Tensorflow model. The table below shows how to do this.
+
+| Model               | repo                                | outputs                                       |
+| ------------------- | ----------------------------------- | --------------------------------------------- |
+| yolov1, yolov1-tiny | https://github.com/thtrieu/darkflow | a `.pb` file and a `.meta` file               |
+| yolov3              | https://github.com/jinyu121/DW2TF   | 3 `.ckpt` files and a file named `checkpoint` |
+
+Then we use these files to generate a Pytorch model by running `pb2pth.py`.
+
+## Thanks
+
+[darkflow](https://github.com/thtrieu/darkflow)
+
+[DW2TF](https://github.com/jinyu121/DW2TF)
