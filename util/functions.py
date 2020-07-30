@@ -2,9 +2,19 @@
 
 import cv2
 import numpy as np
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Union
 
-from functools import wraps
+
+def get_same_paddings(input_size, kernel_size, stride):
+    output_size = (np.ceil(input_size[0] / stride[0]), np.ceil(input_size[1] / stride[1]))
+    pad_h = max(int((output_size[0] - 1) * stride[0] + kernel_size[0] - input_size[0]), 0)
+    pad_w = max(int((output_size[1] - 1) * stride[1] + kernel_size[1] - input_size[1]), 0)
+    pad_top = pad_h // 2
+    pad_bottom = pad_h - pad_top
+    pad_left = pad_w // 2
+    pad_right = pad_w - pad_left
+    return pad_left, pad_right, pad_top, pad_bottom
+
 
 def iou(bbox0: Tuple[float, float, float, float], bbox1: Tuple[float, float, float, float]) -> float:
     x0, y0, w0, h0 = bbox0[:4]
