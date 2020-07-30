@@ -5,93 +5,158 @@ from torch import nn
 import torch.nn.functional as F
 
 
-
 class YOLOv3Backbone(nn.Module):
     def __init__(self):
         super(YOLOv3Backbone, self).__init__()
-        self.conv1 = nn.Conv2d(3, 32, 3, stride=1, padding=1, bias=False)
-        self.batch_norm1 = nn.BatchNorm2d(32)
+        self.set_dbl_layer(1, 1, 3, 32, 3, stride=1, padding=1, bias=False)
+        self.set_dbl_layer(2, 2, 32, 64, 3, stride=2, padding=1, bias=False)
 
-        self.conv2 = nn.Conv2d(32, 64, 3, stride=2, padding=1, bias=False)
-        self.batch_norm2 = nn.BatchNorm2d(64)
+        """ResBlock * 1"""
+        for i in range(3, 5, 2):
+            self.set_dbl_layer(i, i, 64, 32, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i + 1, 32, 64, 3, stride=1, padding=1, bias=False)
 
-        self.conv3 = nn.Conv2d(64, 32, 1, stride=1, padding=0, bias=False)
-        self.batch_norm3 = nn.BatchNorm2d(128)
+        self.set_dbl_layer(5, 5, 64, 128, 3, stride=2, padding=1, bias=False)
+        """ResBlock * 2"""
+        channel_a, channel_b = 128, 64
+        for i in range(6, 10, 2):
+            self.set_dbl_layer(i, i, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i + 1, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
 
-        self.conv4 = nn.Conv2d(128, 256, 3, stride=1, padding=1, bias=False)
-        self.batch_norm4 = nn.BatchNorm2d(256)
-        self.conv5 = nn.Conv2d(256, 256, 1, stride=1, padding=0, bias=False)
-        self.batch_norm5 = nn.BatchNorm2d(256)
-        self.conv6 = nn.Conv2d(256, 512, 3, stride=1, padding=1, bias=False)
-        self.batch_norm6 = nn.BatchNorm2d(512)
-        self.pool3 = nn.MaxPool2d(2, 2)
+        self.set_dbl_layer(10, 10, 128, 256, 3, stride=2, padding=1, bias=False)
+        """ResBlock * 8"""
+        channel_a, channel_b = 256, 128
+        for i in range(11, 27, 2):
+            self.set_dbl_layer(i, i, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i + 1, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
 
-        for i in range(7, 15, 2):
-            setattr(self, 'conv%d' % i, nn.Conv2d(512, 256, 1, stride=1, padding=0, bias=False))
-            setattr(self, 'batch_norm%d' % i, nn.BatchNorm2d(256))
-            setattr(self, 'conv%d' % (i + 1), nn.Conv2d(256, 512, 3, stride=1, padding=1, bias=False))
-            setattr(self, 'batch_norm%d' % (i + 1), nn.BatchNorm2d(512))
-        self.conv15 = nn.Conv2d(512, 512, 1, stride=1, padding=0, bias=False)
-        self.batch_norm15 = nn.BatchNorm2d(512)
-        self.conv16 = nn.Conv2d(512, 1024, 3, stride=1, padding=1, bias=False)
-        self.batch_norm16 = nn.BatchNorm2d(1024)
-        self.pool4 = nn.MaxPool2d(2, 2)
+        self.set_dbl_layer(27, 27, 256, 512, 3, stride=2, padding=1, bias=False)
+        """ResBlock * 8"""
+        channel_a, channel_b = 512, 256
+        for i in range(28, 44, 2):
+            self.set_dbl_layer(i, i, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i + 1, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
 
-        for i in range(17, 21, 2):
-            setattr(self, 'conv%d' % i, nn.Conv2d(1024, 512, 1, stride=1, padding=0, bias=False))
-            setattr(self, 'batch_norm%d' % i, nn.BatchNorm2d(512))
-            setattr(self, 'conv%d' % (i + 1), nn.Conv2d(512, 1024, 3, stride=1, padding=1, bias=False))
-            setattr(self, 'batch_norm%d' % (i + 1), nn.BatchNorm2d(1024))
-        self.conv21 = nn.Conv2d(1024, 1024, 3, stride=1, padding=1, bias=False)
-        self.batch_norm21 = nn.BatchNorm2d(1024)
-        self.conv22 = nn.Conv2d(1024, 1024, 3, stride=2, padding=1, bias=False)
-        self.batch_norm22 = nn.BatchNorm2d(1024)
-        self.conv23 = nn.Conv2d(1024, 1024, 3, stride=1, padding=1, bias=False)
-        self.batch_norm23 = nn.BatchNorm2d(1024)
-        self.conv24 = nn.Conv2d(1024, 1024, 3, stride=1, padding=1, bias=False)
-        self.batch_norm24 = nn.BatchNorm2d(1024)
+        self.set_dbl_layer(44, 44, 512, 1024, 3, stride=2, padding=1, bias=False)
+        """ResBlock * 4"""
+        channel_a, channel_b = 1024, 512
+        for i in range(45, 53, 2):
+            self.set_dbl_layer(i, i, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i + 1, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
 
-        self.local1 = LocallyConnected2d(1024, 256, 3, 7, stride=1, padding=1, bias=False)
-        self.dropout1 = nn.Dropout(0.5)
-        self.fc1 = nn.Linear(256 * 7 * 7, 7 * 7 * 35, bias=True)
+        channel_a, channel_b = 1024, 512
+        for i in range(53, 59, 2):
+            self.set_dbl_layer(i, i, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i + 1, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
+
+        """Output 1"""
+        self.conv59 = nn.Conv2d(1024, 255, 1, stride=1, padding=0, bias=True)
+
+        self.set_dbl_layer(60, 59, 512, 256, 1, stride=1, padding=0, bias=False)
+
+        self.upsample1 = nn.Upsample(scale_factor=2)
+
+        self.set_dbl_layer(61, 60, 768, 256, 1, stride=1, padding=0, bias=False)
+        self.set_dbl_layer(62, 61, 256, 512, 3, stride=1, padding=1, bias=False)
+
+        channel_a, channel_b = 512, 256
+        for i in range(63, 67, 2):
+            self.set_dbl_layer(i, i - 1, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
+
+        """Output 2"""
+        self.conv67 = nn.Conv2d(512, 255, 1, stride=1, padding=0, bias=True)
+
+        self.set_dbl_layer(68, 66, 256, 128, 1, stride=1, padding=0, bias=False)
+
+        self.upsample2 = nn.Upsample(scale_factor=2)
+
+        self.set_dbl_layer(69, 67, 384, 128, 1, stride=1, padding=0, bias=False)
+        self.set_dbl_layer(70, 68, 128, 256, 3, stride=1, padding=1, bias=False)
+
+        channel_a, channel_b = 256, 128
+        for i in range(71, 75, 2):
+            self.set_dbl_layer(i, i - 2, channel_a, channel_b, 1, stride=1, padding=0, bias=False)
+            self.set_dbl_layer(i + 1, i - 1, channel_b, channel_a, 3, stride=1, padding=1, bias=False)
+
+        """Output 3"""
+        self.conv75 = nn.Conv2d(256, 255, 1, stride=1, padding=0, bias=True)
+
+    def set_dbl_layer(self, conv_id, bn_id, in_channels, out_channels, kernel_size, stride, padding, bias):
+        setattr(
+            self, 'conv%d' % conv_id,
+            nn.Conv2d(in_channels, out_channels, kernel_size, stride=stride, padding=padding, bias=bias)
+        )
+        setattr(self, 'batch_norm%d' % bn_id, nn.BatchNorm2d(out_channels))
 
     def forward(self, x):
-        """448 * 448 * 3"""
+        """W * H * 3"""
         x = x.permute(0, 3, 1, 2).float()
-        """3 * 448 * 448"""
-        x = self.conv1(x)
-        x = self.batch_norm1(x)
+        """3 * W * H"""
+        x = self.dbl_forward(x, 1, 1)
+
+        x = self.dbl_forward(x, 2, 2)
+        """ResBlock * 1"""
+        for i in range(3, 5, 2):
+            x = self.res_forward(x, i, i)
+
+        x = self.dbl_forward(x, 5, 5)
+        """ResBlock * 2"""
+        for i in range(6, 10, 2):
+            x = self.res_forward(x, i, i)
+
+        x = self.dbl_forward(x, 10, 10)
+        """ResBlock * 8"""
+        for i in range(11, 27, 2):
+            x = self.res_forward(x, i, i)
+
+        y = self.dbl_forward(x, 27, 27)
+        """ResBlock * 8"""
+        for i in range(28, 44, 2):
+            y = self.res_forward(y, i, i)
+
+        z = self.dbl_forward(y, 44, 44)
+        """ResBlock * 4"""
+        for i in range(45, 53, 2):
+            z = self.res_forward(z, i, i)
+
+        for i in range(53, 58):
+            z = self.dbl_forward(z, i, i)
+        o1 = self.dbl_forward(z, 58, 58)
+        o1 = self.conv59(o1)
+
+        z = self.dbl_forward(z, 60, 59)
+        z = self.upsample1(z)
+
+        y = torch.cat([z, y], 1)
+
+        for i in range(61, 66):
+            y = self.dbl_forward(y, i, i - 1)
+
+        o2 = self.dbl_forward(y, 66, 65)
+        o2 = self.conv67(o2)
+
+        y = self.dbl_forward(y, 68, 66)
+        y = self.upsample2(y)
+
+        x = torch.cat([y, x], 1)
+
+        for i in range(69, 75):
+            x = self.dbl_forward(x, i, i - 2)
+
+        o3 = self.conv75(x)
+
+        return o1, o2, o3
+
+    def dbl_forward(self, x, conv_id, bn_id):
+        x = getattr(self, 'conv%d' % conv_id)(x)
+        x = getattr(self, 'batch_norm%d' % bn_id)(x)
         x = F.leaky_relu(x, 0.1, inplace=False)
-        x = self.pool1(x)
-        """64 * 112 * 112"""
-        x = self.conv2(x)
-        x = self.batch_norm2(x)
-        x = F.leaky_relu(x, 0.1, inplace=False)
-        x = self.pool2(x)
-        """192 * 56 * 56"""
-        for i in range(3, 7):
-            x = getattr(self, 'conv%d' % i)(x)
-            x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=False)
-        x = self.pool3(x)
-        """512 * 28 * 28"""
-        for i in range(7, 17):
-            x = getattr(self, 'conv%d' % i)(x)
-            x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=False)
-        x = self.pool4(x)
-        """1024 * 14 * 14"""
-        for i in range(17, 25):
-            x = getattr(self, 'conv%d' % i)(x)
-            x = getattr(self, 'batch_norm%d' % i)(x)
-            x = F.leaky_relu(x, 0.1, inplace=False)
-        """1024 * 7 * 7"""
-        x = self.local1(x)
-        x = F.leaky_relu(x, 0.1, inplace=False)
-        """256 * 7 * 7"""
-        x = x.view(-1, 256 * 7 * 7)
-        """12544"""
-        x = self.dropout1(x)
-        x = self.fc1(x)
-        """1715"""
+        return x
+
+    def res_forward(self, x, conv_id, bn_id):
+        y = x
+        x = self.dbl_forward(x, conv_id, bn_id)
+        x = self.dbl_forward(x, conv_id + 1, bn_id + 1)
+        x = x + y
         return x
