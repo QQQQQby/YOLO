@@ -20,9 +20,6 @@ def parse_args():
                         help='Save path for Tensorflow weights(.pb or .ckpt).')
     parser.add_argument('--save_path', type=str, default='',
                         help='Save path for Pytorch weights(.pth).')
-    # parser.add_argument('--valid_image_path', type=str, default='',
-    #                     help='Path of image for validation.'
-    #                          'If empty, the validation will not proceed.')
     parser.add_argument('--model_name', type=str, default='',
                         help='Name of the model. ',
                         choices=["yolov1", "yolov1-tiny", "yolov3"])
@@ -195,7 +192,7 @@ if __name__ == '__main__':
 
         print("Done:", time.time() - start_time, "s")
 
-        # torch.save(pth_model, save_path)
+        torch.save(pth_model, save_path)
         """validate"""
         outputs_pth = {}
 
@@ -210,23 +207,17 @@ if __name__ == '__main__':
         for name, module in pth_model.named_children():
             module.register_forward_hook(get_output_hook(name))
 
-        inp = cv2.imread("data/dog.jpg").copy()
-        inp = inp[:, :, ::-1]
-        inp = inp / 255.
-        inp = inp.copy()
-
         if "v1" in model_name:
-            inp = np.expand_dims(inp, 0)
+            inp = np.random.random([1, 448, 448, 3])
             output_pth = pth_model(torch.from_numpy(inp))
             print(
                 outputs_pth['fc1'].detach().numpy() -
                 sess.run(sess.graph.get_tensor_by_name("output:0"), feed_dict={"input:0": inp})
             )
         elif "v3" in model_name:
-            inp = cv2.resize(inp, (608, 608))
-            inp = np.expand_dims(inp, 0)
+            inp = np.random.random([1, 608, 608, 3])
             output_pth = pth_model(torch.from_numpy(inp))
-            o1, o2, o3, d = output_pth
+            o1, o2, o3 = output_pth
             print(o1.shape)
             print(o2.shape)
             print(o3.shape)
@@ -234,20 +225,6 @@ if __name__ == '__main__':
                   sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional59/BiasAdd:0"),
                            feed_dict={"yolov3/net1:0": inp})
                   )
-
-            # print(d["1"].permute(0, 2, 3, 1).detach().numpy() - sess.run(
-            #     sess.graph.get_tensor_by_name("yolov3/convolutional1/Activation:0"),
-            #     feed_dict={"yolov3/net1:0": inp}))
-            # print(d["2"].permute(0, 2, 3, 1).detach().numpy() -sess.run(
-            #                sess.graph.get_tensor_by_name("yolov3/convolutional2/Activation:0"),
-            #                feed_dict={"yolov3/net1:0": inp}))
-            # print(outputs_pth['conv2'].detach().permute(0, 2, 3, 1).numpy() -
-            #       sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional2/Conv2D:0"),
-            #                feed_dict={"yolov3/net1:0": inp}))
-            # print(outputs_pth['batch_norm1'].detach().permute(0, 2, 3, 1).numpy() -
-            #       sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional1/BatchNorm/FusedBatchNorm:0"),
-            #                feed_dict={"yolov3/net1:0": inp}))
-
             print(o2.permute(0, 2, 3, 1).detach().numpy() -
                   sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional67/BiasAdd:0"),
                            feed_dict={"yolov3/net1:0": inp})
@@ -256,6 +233,12 @@ if __name__ == '__main__':
                   sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional75/BiasAdd:0"),
                            feed_dict={"yolov3/net1:0": inp})
                   )
+            # print(outputs_pth['conv2'].detach().permute(0, 2, 3, 1).numpy() -
+            #       sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional2/Conv2D:0"),
+            #                feed_dict={"yolov3/net1:0": inp}))
+            # print(outputs_pth['batch_norm1'].detach().permute(0, 2, 3, 1).numpy() -
+            #       sess.run(sess.graph.get_tensor_by_name("yolov3/convolutional1/BatchNorm/FusedBatchNorm:0"),
+            #                feed_dict={"yolov3/net1:0": inp}))
         # tff = lambda x: sess.run(sess.graph.get_tensor_by_name(x), feed_dict={"input:0": inp})
         # print(
         #     outputs_pth['conv1'].detach().numpy().swapaxes(1, 3).swapaxes(1, 2) -

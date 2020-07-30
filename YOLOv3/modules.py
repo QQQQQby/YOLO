@@ -92,15 +92,11 @@ class YOLOv3Backbone(nn.Module):
         setattr(self, 'batch_norm%d' % bn_id, nn.BatchNorm2d(out_channels))
 
     def forward(self, x):
-
-        debug_dict = {}
         """W * H * 3"""
         x = x.permute(0, 3, 1, 2).float()
         """3 * W * H"""
         x = self.dbl_forward(x, 1, 1)
-        debug_dict["1"] = x.detach()
         x = self.dbl_forward(x, 2, 2)
-        debug_dict["2"] = x.detach()
 
         """ResBlock * 1"""
         for i in range(3, 5, 2):
@@ -152,7 +148,7 @@ class YOLOv3Backbone(nn.Module):
 
         o3 = self.conv75(x)
 
-        return o1, o2, o3, debug_dict
+        return o1, o2, o3
 
     def dbl_forward(self, x, conv_id, bn_id):
         kernel_size = getattr(self, 'conv%d' % conv_id).kernel_size
