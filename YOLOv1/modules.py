@@ -96,7 +96,17 @@ class YOLOv1Backbone(nn.Module):
         x = self.dropout1(x)
         x = self.fc1(x)
         """1715"""
-        return x
+        num_classes = 20
+        num_bboxes = 3
+        S = 7
+        boundary = (S * S * num_classes, S * S * (num_classes + num_bboxes))
+        probs = x[:, :boundary[0]]
+        probs = probs.view(-1, S, S, num_classes)
+        confs = x[:, boundary[0]:boundary[1]]
+        confs = confs.view(-1, S, S, num_bboxes)
+        coords = x[:, boundary[1]:]
+        coords = coords.view(-1, S, S, num_bboxes, 4)
+        return [probs], [confs], [coords]
 
 
 class TinyYOLOv1Backbone(nn.Module):
@@ -154,4 +164,14 @@ class TinyYOLOv1Backbone(nn.Module):
         """25088"""
         x = self.fc1(x)
         """1470"""
-        return x
+        num_classes = 20
+        num_bboxes = 2
+        S = 7
+        boundary = (S * S * num_classes, S * S * (num_classes + num_bboxes))
+        probs = x[:, :boundary[0]]
+        probs = probs.view(-1, S, S, num_classes)
+        confs = x[:, boundary[0]:boundary[1]]
+        confs = confs.view(-1, S, S, num_bboxes)
+        coords = x[:, boundary[1]:]
+        coords = coords.view(-1, S, S, num_bboxes, 4)
+        return [probs], [confs], [coords]

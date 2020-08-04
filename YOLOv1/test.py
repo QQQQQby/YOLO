@@ -1,18 +1,5 @@
 # coding: utf-8
 
-import torch
-from torch import nn
-from xml.dom import minidom
-import cv2
-from tqdm import tqdm
-import numpy as np
-import argparse
-import os
-
-from YOLOv1.modules import YOLOv1Backbone
-from YOLOv1.models import YOLOv1
-from data.loaders import VOCDataLoader
-from util.functions import show_objects
 from util.metrics import get_AP
 
 if __name__ == '__main__':

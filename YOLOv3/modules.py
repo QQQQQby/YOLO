@@ -148,7 +148,9 @@ class YOLOv3Backbone(nn.Module):
 
         o3 = self.conv75(x)
 
-        return o1, o2, o3
+        prob_list, coord_list, conf_list = [],[],[]
+
+        return prob_list, conf_list, coord_list
 
     def dbl_forward(self, x, conv_id, bn_id):
         kernel_size = getattr(self, 'conv%d' % conv_id).kernel_size

@@ -126,7 +126,7 @@ class VOCDataLoader(DataLoader):
         res = []
         dom = minidom.parse(path)
 
-        size = dom.getElementsByTagName('size')[0]
+        # size = dom.getElementsByTagName('size')[0]
         # w_abs = eval(size.getElementsByTagName('width')[0].firstChild.data)
         # h_abs = eval(size.getElementsByTagName('height')[0].firstChild.data)
 
@@ -146,18 +146,14 @@ class VOCDataLoader(DataLoader):
         return res
 
 
-def read_classes_and_colors(path):
+def read_classes(path):
     with open(path, "r") as f:
-        text = f.read().strip().split("\n")
-    labels, colors = [], {}
-    for line in text:
-        line = line.split()
-        labels.append(line[0])
-        colors[line[0]] = tuple(map(int, line[1:]))
-    return labels, colors
+        return f.read().strip().split("\n")
 
 
-if __name__ == '__main__':
-    loader = VOCDataLoader('G:/DataSets/VOC2012', 0.01)
-    print(loader.get_data_train())
-    print()
+def get_color_dict(classes, color_path):
+    color_dict = {}
+    with open(color_path, "r") as f:
+        for c in classes:
+            color_dict[c] = [int(t) for t in f.readline().split(" ")]
+    return color_dict

@@ -16,13 +16,13 @@ def get_same_paddings(input_size, kernel_size, stride):
     return pad_left, pad_right, pad_top, pad_bottom
 
 
-def iou(bbox0: Tuple[float, float, float, float], bbox1: Tuple[float, float, float, float]) -> float:
+def iou(bbox0: Tuple, bbox1: Tuple) -> float:
     x0, y0, w0, h0 = bbox0[:4]
     x1, y1, w1, h1 = bbox1[:4]
-    upper_left0 = (round(x0 - w0 / 2), round(y0 - h0 / 2))
-    upper_left1 = (round(x1 - w1 / 2), round(y1 - h1 / 2))
-    lower_right0 = (round(x0 + w0 / 2), round(y0 + h0 / 2))
-    lower_right1 = (round(x1 + w1 / 2), round(y1 + h1 / 2))
+    upper_left0 = (round(x0 - w0 // 2), round(y0 - h0 // 2))
+    upper_left1 = (round(x1 - w1 // 2), round(y1 - h1 // 2))
+    lower_right0 = (round(x0 + w0 // 2), round(y0 + h0 // 2))
+    lower_right1 = (round(x1 + w1 // 2), round(y1 + h1 // 2))
     inter_upper_left = (max(upper_left0[0], upper_left1[0]), max(upper_left0[1], upper_left1[1]))
     inter_lower_right = (min(lower_right0[0], lower_right1[0]), min(lower_right0[1], lower_right1[1]))
 
@@ -60,49 +60,28 @@ def draw_image(image_array: np.ndarray, objects, color_dict):
     return image
 
 
-def NMS(output_dict, image_id, model, classes):
-    results = []
-    for class_name in classes:
-        candidates = []
-        for row in range(model.S):
-            for col in range(model.S):
-                for bbox_id in range(model.B):
-                    x_label = "x" + str(bbox_id)
-                    y_label = "y" + str(bbox_id)
-                    w_label = "w" + str(bbox_id)
-                    h_label = "h" + str(bbox_id)
-                    c_label = "c" + str(bbox_id)
-                    score = float(output_dict[c_label][image_id, row, col] *
-                                  output_dict["probs"][image_id, row, col, model.classes.index(class_name)])
-                    if score >= model.score_threshold:
-                        candidates.append({
-                            "name": class_name,
-                            "score": score,
-                            "x": float(output_dict[x_label][image_id, row, col]),
-                            "y": float(output_dict[y_label][image_id, row, col]),
-                            "w": float(output_dict[w_label][image_id, row, col]),
-                            "h": float(output_dict[h_label][image_id, row, col])
-                        })
-        # print(candidates)
-        candidates.sort(key=lambda x: -x["score"])
-        for c_i in range(len(candidates) - 1):
-            if candidates[c_i]["score"] > 0:
-                for c_j in range(c_i + 1, len(candidates)):
-                    if iou(
-                            (candidates[c_i]["x"],
-                             candidates[c_i]["y"],
-                             candidates[c_i]["w"],
-                             candidates[c_i]["h"]),
-                            (candidates[c_j]["x"],
-                             candidates[c_j]["y"],
-                             candidates[c_j]["w"],
-                             candidates[c_j]["h"])
-                    ) > model.iou_threshold:
-                        candidates[c_j]["score"] = -1
-        results += list(filter(lambda x: x["score"] >= 0, candidates))
-    return results
+def NMS(candidates: List, iou_threshold: int) -> List:
+    # results = sorted(candidates,key=lambda x: -x["score"])
+    # print(results)
+    if len(candidates) == 0:
+        return []
+    candidates.sort(key=lambda x: -x["score"])
+    for c_i in range(len(candidates) - 1):
+        if candidates[c_i]["score"] > 0:
+            for c_j in range(c_i + 1, len(candidates)):
+                if iou(
+                        (candidates[c_i]["x"],
+                         candidates[c_i]["y"],
+                         candidates[c_i]["w"],
+                         candidates[c_i]["h"]),
+                        (candidates[c_j]["x"],
+                         candidates[c_j]["y"],
+                         candidates[c_j]["w"],
+                         candidates[c_j]["h"])
+                ) > iou_threshold:
+                    candidates[c_j]["score"] = -1
+    return list(filter(lambda x: x["score"] >= 0, candidates))
 
 
 def NMS_multi_process(inp):
-    # output_dict, image_id, classes, score_threshold, iou_threshold
     return NMS(*inp)
