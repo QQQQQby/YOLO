@@ -52,7 +52,7 @@ class YOLO:
         if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
             self.image_size = 448
         elif isinstance(self.backbone, YOLOv3Backbone):
-            self.image_size = 608
+            self.image_size = 416
             self.anchor_mask = [[6, 7, 8], [3, 4, 5], [0, 1, 2]]
             self.anchors = anchors
 
@@ -159,16 +159,16 @@ class YOLO:
         self.backbone.eval()
         if output_dicts is None:
             with torch.no_grad():
-                output_dicts = self.get_output_dicts(images)
+                output_dicts = self.get_output_dicts(images, tensor_to_numpy=True)
 
         a = time.time()
-        converted_outputs = self.get_converted_outputs(output_dicts)
+        self.convert_outputs(output_dicts)
         b = time.time()
         print("convert:", b - a, "s")
 
         a = time.time()
         candidates = [[[] for j in self.classes] for i in images]
-        for current_output in converted_outputs:
+        for current_output in output_dicts:
             B = current_output["B"]
             S = current_output["S"]
 
@@ -236,31 +236,20 @@ class YOLO:
         print("NMS:", b - a, "s")
         return results
 
-    def get_converted_outputs(self, output_dicts):
-        results = []
+    def convert_outputs(self, output_dicts):
         for detect_layer_id, output_dict in enumerate(output_dicts):
             B = output_dict["B"]
             S = output_dict["S"]
-            current_result = {"B": B, "S": S}
-            for bbox_id in range(B):
-                xy_label = "xy" + str(bbox_id)
-                wh_label = "wh" + str(bbox_id)
-                c_label = "c" + str(bbox_id)
-                p_label = "p" + str(bbox_id)
-                current_result[xy_label] = output_dict[xy_label].detach().cpu().numpy()
-                current_result[wh_label] = output_dict[wh_label].detach().cpu().numpy()
-                current_result[c_label] = output_dict[c_label].detach().cpu().numpy()
-                current_result[p_label] = output_dict[p_label].detach().cpu().numpy()
             if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
                 for bbox_id in range(B):
                     xy_label = "xy" + str(bbox_id)
                     wh_label = "wh" + str(bbox_id)
                     col_offsets = np.resize(np.arange(S), [S, S])
-                    current_result[xy_label][..., 0] = (current_result[xy_label][..., 0] + col_offsets)
+                    output_dict[xy_label][..., 0] = (output_dict[xy_label][..., 0] + col_offsets)
                     row_offsets = col_offsets.transpose()
-                    current_result[xy_label][..., 1] = (current_result[xy_label][..., 1] + row_offsets)
-                    current_result[xy_label] = current_result[xy_label] * ((self.image_size - 1) / S)
-                    current_result[wh_label] = current_result[wh_label] ** 2 * self.image_size
+                    output_dict[xy_label][..., 1] = (output_dict[xy_label][..., 1] + row_offsets)
+                    output_dict[xy_label] = output_dict[xy_label] * ((self.image_size - 1) / S)
+                    output_dict[wh_label] = output_dict[wh_label] ** 2 * self.image_size
             elif isinstance(self.backbone, YOLOv3Backbone):
                 for bbox_id in range(B):
                     xy_label = "xy" + str(bbox_id)
@@ -268,19 +257,19 @@ class YOLO:
                     c_label = "c" + str(bbox_id)
                     p_label = "p" + str(bbox_id)
                     col_offsets = np.resize(np.arange(S), [S, S])
-                    current_result[xy_label] = sigmoid(current_result[xy_label])
-                    current_result[xy_label][..., 0] += col_offsets
+                    output_dict[xy_label] = sigmoid(output_dict[xy_label])
+                    output_dict[xy_label][..., 0] += col_offsets
                     row_offsets = col_offsets.transpose()
-                    current_result[xy_label][..., 1] += row_offsets
-                    current_result[xy_label] *= ((self.image_size - 1) / S)
-                    current_result[wh_label] = np.exp(current_result[wh_label]) * \
-                                               self.anchors[self.anchor_mask[detect_layer_id]][bbox_id]
+                    output_dict[xy_label][..., 1] += row_offsets
+                    output_dict[xy_label] *= ((self.image_size - 1) / S)
+                    output_dict[xy_label] = np.array(output_dict[xy_label], int)
+                    output_dict[wh_label] = np.exp(output_dict[wh_label]) * \
+                                            self.anchors[self.anchor_mask[detect_layer_id]][bbox_id]
+                    output_dict[wh_label] = np.array(output_dict[wh_label], int)
                     x = time.time()
-                    current_result[c_label] = sigmoid(current_result[c_label])
-                    current_result[p_label] = sigmoid(current_result[p_label])
+                    output_dict[c_label] = sigmoid(output_dict[c_label])
+                    output_dict[p_label] = sigmoid(output_dict[p_label])
                     print(time.time() - x, "sigmoid")
-            results.append(current_result)
-        return results
 
     def get_mmAP(self, batch, pred_results=None, iou_thresholds=None):
         if pred_results is None:
@@ -337,12 +326,17 @@ class YOLO:
         mmAP = sum(mAPs) / len(mAPs)
         return mmAP
 
-    def get_output_dicts(self, images):
+    def get_output_dicts(self, images, tensor_to_numpy=False):
+        a = time.time()
         prob_list, conf_list, coord_list = self.backbone(
             torch.from_numpy(np.array(images) / 255.).to(self.device)
         )
         output_dicts = []
         for probs, confs, coords in zip(prob_list, conf_list, coord_list):
+            if tensor_to_numpy:
+                probs = probs.cpu().numpy()
+                confs = confs.cpu().numpy()
+                coords = coords.cpu().numpy()
             S = probs.shape[2]
             B = probs.shape[3]
             num_classes = probs.shape[4]
@@ -358,6 +352,7 @@ class YOLO:
                 current_dict[p_label] = probs[..., bbox_id, :]
             current_dict.update(S=S, B=B, num_classes=num_classes)
             output_dicts.append(current_dict)
+        print(time.time() - a, "output")
         return output_dicts
 
     def save(self, model_save_path):
