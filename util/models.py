@@ -17,7 +17,7 @@ from multiprocessing import Pool
 
 
 class YOLO:
-    def __init__(self, classes, model_name=None, model_load_path=None, device_ids='-1'):
+    def __init__(self, classes, model_name=None, model_load_path=None, anchors=None, device_ids='-1'):
         self.optimizer = None
 
         self.classes = classes
@@ -51,12 +51,9 @@ class YOLO:
         if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
             self.image_size = 448
         elif isinstance(self.backbone, YOLOv3Backbone):
-            self.image_size = 416
-        # self.S = 7
-        # if isinstance(self.backbone, YOLOv1Backbone):
-        #     self.B = 3
-        # else:
-        #     self.B = 2
+            self.image_size = 608
+            self.anchor_mask = [[6, 7, 8], [3, 4, 5], [0, 1, 2]]
+            self.anchors = anchors
 
     def get_optimizer(self, name, lr, momentum):
         if self.optimizer is None:
@@ -164,77 +161,44 @@ class YOLO:
                 output_dicts = self.get_output_dicts(images)
 
         a = time.time()
-        for output_dict in output_dicts:
-            num_classes = output_dict["num_classes"]
-            B = output_dict["B"]
-            S = output_dict["S"]
-
-            """Make x, y, w and h offsets after normalization"""
-            if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
-                for bbox_id in range(B):
-                    w_label = "w" + str(bbox_id)
-                    h_label = "h" + str(bbox_id)
-                    output_dict[w_label] = output_dict[w_label] ** 2
-                    output_dict[h_label] = output_dict[h_label] ** 2
-            elif isinstance(self.backbone, YOLOv3Backbone):
-                for bbox_id in range(B):
-                    x_label = "x" + str(bbox_id)
-                    y_label = "y" + str(bbox_id)
-                    w_label = "w" + str(bbox_id)
-                    h_label = "h" + str(bbox_id)
-                    c_label = "c" + str(bbox_id)
-                    """"""
-
-            for bbox_id in range(B):
-                x_label = "x" + str(bbox_id)
-                y_label = "y" + str(bbox_id)
-                w_label = "w" + str(bbox_id)
-                h_label = "h" + str(bbox_id)
-                output_dict[w_label] = output_dict[w_label] * self.image_size
-                output_dict[h_label] = output_dict[h_label] * self.image_size
-                # Could be faster
-                for row in range(S):
-                    output_dict[y_label][:, row, :] = output_dict[y_label][:, row, :] + row
-                for col in range(S):
-                    output_dict[x_label][:, :, col] = output_dict[x_label][:, :, col] + col
-                output_dict[x_label] = output_dict[x_label] * (self.image_size - 1) / S
-                output_dict[y_label] = output_dict[y_label] * (self.image_size - 1) / S
+        converted_outputs = self.get_converted_outputs(output_dicts)
         b = time.time()
-        print("normalize:", b - a, "s")
+        print("convert:", b - a, "s")
 
         a = time.time()
         candidates = [[[] for j in self.classes] for i in images]
-        for output_dict in output_dicts:
-            num_classes = output_dict["num_classes"]
-            B = output_dict["B"]
-            S = output_dict["S"]
+        for current_output in converted_outputs:
+            B = current_output["B"]
+            S = current_output["S"]
 
-            scores = torch.zeros(B, len(images), S, S, num_classes)
+            scores = []
             for bbox_id in range(B):
                 c_label = "c" + str(bbox_id)
                 p_label = "p" + str(bbox_id)
-                scores[bbox_id] = (output_dict[c_label].unsqueeze(-1) * output_dict[p_label])
-            are_candidates = scores >= score_threshold
-            scores = scores.cpu().detach().numpy()
-            are_candidates = are_candidates.cpu().detach().numpy()
-            for bbox_id in range(B):
+                scores.append([current_output[c_label].reshape([len(images), S, S, 1]) * current_output[p_label]])
+            scores = np.concatenate(scores)
+            # shape of scores: B * images * S * S * num_classes
+
+            bbox_ids, image_ids, row_ids, col_ids, class_ids = np.where(scores >= score_threshold)
+            for i in range(len(bbox_ids)):
+                bbox_id = bbox_ids[i]
                 x_label = "x" + str(bbox_id)
                 y_label = "y" + str(bbox_id)
                 w_label = "w" + str(bbox_id)
                 h_label = "h" + str(bbox_id)
-                for class_id, class_name in enumerate(self.classes):
-                    for image_id in range(len(images)):
-                        for row in range(S):
-                            for col in range(S):
-                                if are_candidates[bbox_id, image_id, row, col, class_id]:
-                                    candidates[image_id][class_id].append({
-                                        "name": class_name,
-                                        "score": scores[bbox_id, image_id, row, col, class_id],
-                                        "x": float(output_dict[x_label][image_id, row, col]),
-                                        "y": float(output_dict[y_label][image_id, row, col]),
-                                        "w": float(output_dict[w_label][image_id, row, col]),
-                                        "h": float(output_dict[h_label][image_id, row, col])
-                                    })
+                class_id = class_ids[i]
+                image_id = image_ids[i]
+                row = row_ids[i]
+                col = col_ids[i]
+                candidates[image_id][class_id].append({
+                    "name": self.classes[class_id],
+                    "score": scores[bbox_id, image_id, row, col, class_id],
+                    "x": current_output[x_label][image_id, row, col],
+                    "y": current_output[y_label][image_id, row, col],
+                    "w": current_output[w_label][image_id, row, col],
+                    "h": current_output[h_label][image_id, row, col]
+                })
+
         b = time.time()
         print("get candidates:", b - a, "s")
 
@@ -242,10 +206,10 @@ class YOLO:
         results = []
         if num_processes == 0:
             for image_id in range(len(images)):
-                current_result = []
+                current_output = []
                 for class_id in range(len(self.classes)):
-                    current_result += NMS(candidates[image_id][class_id], iou_threshold)
-                results.append(current_result)
+                    current_output += NMS(candidates[image_id][class_id], iou_threshold)
+                results.append(current_output)
         else:
             p = Pool(num_processes)
             inputs = []
@@ -271,6 +235,63 @@ class YOLO:
 
         b = time.time()
         print("NMS:", b - a, "s")
+        return results
+
+    def get_converted_outputs(self, output_dicts):
+        results = []
+        for detect_layer_id, output_dict in enumerate(output_dicts):
+            B = output_dict["B"]
+            S = output_dict["S"]
+
+            current_result = {}
+            for key in output_dict:
+                current_result[key] = output_dict[key]
+            for bbox_id in range(B):
+                x_label = "x" + str(bbox_id)
+                y_label = "y" + str(bbox_id)
+                w_label = "w" + str(bbox_id)
+                h_label = "h" + str(bbox_id)
+                c_label = "c" + str(bbox_id)
+                p_label = "p" + str(bbox_id)
+                current_result[x_label] = current_result[x_label].cpu().numpy()
+                current_result[y_label] = current_result[y_label].cpu().numpy()
+                current_result[w_label] = current_result[w_label].cpu().numpy()
+                current_result[h_label] = current_result[h_label].cpu().numpy()
+                current_result[c_label] = current_result[c_label].cpu().numpy()
+                current_result[p_label] = current_result[p_label].cpu().numpy()
+            if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
+                for bbox_id in range(B):
+                    x_label = "x" + str(bbox_id)
+                    y_label = "y" + str(bbox_id)
+                    w_label = "w" + str(bbox_id)
+                    h_label = "h" + str(bbox_id)
+                    col_offsets = np.resize(np.arange(S), [S, S])
+                    current_result[x_label] = (current_result[x_label] + col_offsets) * (self.image_size - 1) / S
+                    row_offsets = col_offsets.transpose()
+                    current_result[y_label] = (current_result[y_label] + row_offsets) * (self.image_size - 1) / S
+                    current_result[w_label] = current_result[w_label] ** 2 * self.image_size
+                    current_result[h_label] = current_result[h_label] ** 2 * self.image_size
+            elif isinstance(self.backbone, YOLOv3Backbone):
+                for bbox_id in range(B):
+                    x_label = "x" + str(bbox_id)
+                    y_label = "y" + str(bbox_id)
+                    w_label = "w" + str(bbox_id)
+                    h_label = "h" + str(bbox_id)
+                    c_label = "c" + str(bbox_id)
+                    p_label = "p" + str(bbox_id)
+                    col_offsets = np.resize(np.arange(S), [S, S])
+                    current_result[x_label] = (sigmoid(current_result[x_label]) + col_offsets) * \
+                                              (self.image_size - 1) / S
+                    row_offsets = col_offsets.transpose()
+                    current_result[y_label] = (sigmoid(current_result[y_label]) + row_offsets) * \
+                                              (self.image_size - 1) / S
+                    current_result[w_label] = np.exp(current_result[w_label]) * \
+                                              self.anchors[self.anchor_mask[detect_layer_id]][bbox_id, 0]
+                    current_result[h_label] = np.exp(current_result[h_label]) * \
+                                              self.anchors[self.anchor_mask[detect_layer_id]][bbox_id, 1]
+                    current_result[c_label] = sigmoid(current_result[c_label])
+                    current_result[p_label] = sigmoid(current_result[p_label])
+            results.append(current_result)
         return results
 
     def get_mmAP(self, batch, pred_results=None, iou_thresholds=None):
@@ -336,8 +357,8 @@ class YOLO:
         output_dicts = []
         for probs, confs, coords in zip(prob_list, conf_list, coord_list):
             S = probs.shape[2]
-            num_classes = probs.shape[3]
-            B = confs.shape[3]
+            B = probs.shape[3]
+            num_classes = probs.shape[4]
             current_dict = {}
             for bbox_id in range(B):
                 x_label = "x" + str(bbox_id)
@@ -345,19 +366,13 @@ class YOLO:
                 w_label = "w" + str(bbox_id)
                 h_label = "h" + str(bbox_id)
                 c_label = "c" + str(bbox_id)
+                p_label = "p" + str(bbox_id)
                 current_dict[x_label] = coords[..., bbox_id, 0]
                 current_dict[y_label] = coords[..., bbox_id, 1]
                 current_dict[w_label] = coords[..., bbox_id, 2]
                 current_dict[h_label] = coords[..., bbox_id, 3]
                 current_dict[c_label] = confs[..., bbox_id]
-            if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
-                for bbox_id in range(B):
-                    p_label = "p" + str(bbox_id)
-                    current_dict[p_label] = probs
-            elif isinstance(self.backbone, YOLOv3Backbone):
-                for bbox_id in range(B):
-                    p_label = "p" + str(bbox_id)
-                    current_dict[p_label] = probs[..., bbox_id, :]
+                current_dict[p_label] = probs[..., bbox_id, :]
             current_dict.update(S=S, B=B, num_classes=num_classes)
             output_dicts.append(current_dict)
         b = time.time()

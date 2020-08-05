@@ -6,6 +6,7 @@ from xml.dom import minidom
 import cv2
 from tqdm import tqdm
 from multiprocessing import Pool
+import numpy as np
 
 
 class DataLoader:
@@ -157,3 +158,9 @@ def get_color_dict(classes, color_path):
         for c in classes:
             color_dict[c] = [int(t) for t in f.readline().split(" ")]
     return color_dict
+
+
+def read_anchors(path):
+    with open(path) as f:
+        l = [float(v) for v in f.readline().split(",")]
+    return np.array([[l[i], l[i + 1]] for i in range(0, len(l), 2)])

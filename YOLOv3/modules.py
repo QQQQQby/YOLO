@@ -1,4 +1,5 @@
 # coding: utf-8
+import time
 
 import torch
 from torch import nn
@@ -148,15 +149,34 @@ class YOLOv3Backbone(nn.Module):
 
         o3 = self.conv75(x)
 
-        prob_list, coord_list, conf_list = [],[],[]
+        B = 3
+        num_classes = 80
+
+        o1 = o1.permute(0, 2, 3, 1)
+        o2 = o2.permute(0, 2, 3, 1)
+        o3 = o3.permute(0, 2, 3, 1)
+        o1 = o1.view(*(o1.size()[:3]), B, num_classes + 5)
+        o2 = o2.view(*(o2.size()[:3]), B, num_classes + 5)
+        o3 = o3.view(*(o3.size()[:3]), B, num_classes + 5)
+        prob_list, coord_list, conf_list = [], [], []
+        coord_list.append(o1[..., :4])
+        coord_list.append(o2[..., :4])
+        coord_list.append(o3[..., :4])
+        conf_list.append(o1[..., 4])
+        conf_list.append(o2[..., 4])
+        conf_list.append(o3[..., 4])
+        prob_list.append(o1[..., 5:])
+        prob_list.append(o2[..., 5:])
+        prob_list.append(o3[..., 5:])
 
         return prob_list, conf_list, coord_list
 
     def dbl_forward(self, x, conv_id, bn_id):
-        kernel_size = getattr(self, 'conv%d' % conv_id).kernel_size
-        stride = getattr(self, 'conv%d' % conv_id).stride
+        conv_layer = getattr(self, 'conv%d' % conv_id)
+        kernel_size = conv_layer.kernel_size
+        stride = conv_layer.stride
         x = F.pad(x, get_same_paddings(x.shape[-2:], kernel_size, stride))
-        x = getattr(self, 'conv%d' % conv_id)(x)
+        x = conv_layer(x)
         x = getattr(self, 'batch_norm%d' % bn_id)(x)
         x = F.leaky_relu(x, 0.1, inplace=False)
         return x

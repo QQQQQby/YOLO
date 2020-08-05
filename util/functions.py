@@ -9,10 +9,10 @@ def get_same_paddings(input_size, kernel_size, stride):
     output_size = (np.ceil(input_size[0] / stride[0]), np.ceil(input_size[1] / stride[1]))
     pad_h = max(int((output_size[0] - 1) * stride[0] + kernel_size[0] - input_size[0]), 0)
     pad_w = max(int((output_size[1] - 1) * stride[1] + kernel_size[1] - input_size[1]), 0)
-    pad_top = pad_h // 2
-    pad_bottom = pad_h - pad_top
-    pad_left = pad_w // 2
-    pad_right = pad_w - pad_left
+    pad_bottom = pad_h // 2
+    pad_top = pad_h - pad_bottom
+    pad_right = pad_w // 2
+    pad_left = pad_w - pad_right
     return pad_left, pad_right, pad_top, pad_bottom
 
 
@@ -40,22 +40,23 @@ def show_objects(image_array: np.ndarray, objects, color_dict, delay=0):
 
 
 def draw_image(image_array: np.ndarray, objects, color_dict):
-    image = image_array[:, :, ::-1].copy()
-    for o in objects:
-        upper_left = (int(o['x'] - o['w'] / 2), int(o['y'] - o['h'] / 2))
-        lower_right = (int(o['x'] + o['w'] / 2), int(o['y'] + o['h'] / 2))
-        cv2.rectangle(image, upper_left, lower_right, color_dict[o['name']][::-1], 2)
+    image = image_array.copy()
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    h, w = image_array.shape[:2]
+    upper_left_list = [(max(int(o['x'] - o['w'] // 2), 0), max(int(o['y'] - o['h'] // 2), 0)) for o in objects]
+    lower_right_list = [(min(int(o['x'] + o['w'] // 2), w), min(int(o['y'] + o['h'] // 2), h)) for o in objects]
+    for i, o in enumerate(objects):
+        cv2.rectangle(image, upper_left_list[i], lower_right_list[i], color_dict[o['name']][::-1], 2)
         # cv2.rectangle(image, upper_left, lower_right, (255, 0, 0)[::-1], 1)
-    for o in objects:
-        upper_left = (int(o['x'] - o['w'] / 2), int(o['y'] - o['h'] / 2))
+    for i, o in enumerate(objects):
         cv2.rectangle(
             image,
-            upper_left,
-            (upper_left[0] + len(o['name'] * 10), max(upper_left[1] - 16, 0)),
+            upper_left_list[i],
+            (upper_left_list[i][0] + len(o['name'] * 10), max(upper_left_list[i][1] - 16, 0)),
             color_dict[o['name']][::-1],
             -1
         )
-        upper_left = (upper_left[0] + 2, max(upper_left[1] - 4, 12))
+        upper_left = (upper_left_list[i][0] + 2, max(upper_left_list[i][1] - 4, 12))
         cv2.putText(image, o['name'], upper_left, cv2.FONT_HERSHEY_TRIPLEX, 0.4, (255, 255, 255)[::-1], 1)
     return image
 
@@ -85,3 +86,7 @@ def NMS(candidates: List, iou_threshold: int) -> List:
 
 def NMS_multi_process(inp):
     return NMS(*inp)
+
+
+def sigmoid(array: np.ndarray) -> np.ndarray:
+    return 1 / (1 + np.exp(-array))

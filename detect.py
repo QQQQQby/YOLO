@@ -3,7 +3,7 @@
 import argparse
 import torch
 
-from util.loaders import read_classes, get_color_dict
+from util.loaders import read_classes, get_color_dict, read_anchors
 from util.models import YOLO
 from YOLOv1.modules import YOLOv1Backbone, TinyYOLOv1Backbone
 from YOLOv3.modules import YOLOv3Backbone
@@ -12,11 +12,13 @@ from YOLOv3.modules import YOLOv3Backbone
 def parse_args():
     parser = argparse.ArgumentParser(description="Object detection.")
     parser.add_argument('--model_load_path', type=str, default='',
-                        help='Input path for models.')
+                        help='Input path to models.')
     parser.add_argument('--class_path', type=str, default='',
-                        help='Path for a file to store names and colors of the classes.')
+                        help='Path to a file to store names and colors of the classes.')
     parser.add_argument('--color_path', type=str, default='data/colors',
                         help='Path to a file which stores colors.')
+    parser.add_argument('--anchor_path', type=str, default='data/anchors',
+                        help='Input path to anchors.')
 
     parser.add_argument('--type', type=str, default='image',
                         help='Select detect type.',
@@ -40,7 +42,11 @@ if __name__ == '__main__':
     args = parse_args()
     classes = read_classes(args["class_path"])
     color_dict = get_color_dict(classes, args["color_path"])
-    model = YOLO(classes, model_load_path=args["model_load_path"], device_ids=args["device_ids"])
+    anchors = read_anchors(args["anchor_path"]) if args["anchor_path"] else None
+    model = YOLO(classes,
+                 model_load_path=args["model_load_path"],
+                 anchors=anchors,
+                 device_ids=args["device_ids"])
     if args["type"] == 'image':
         model.detect_image_and_show(
             args["file_path"],

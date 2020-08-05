@@ -97,15 +97,19 @@ class YOLOv1Backbone(nn.Module):
         x = self.fc1(x)
         """1715"""
         num_classes = 20
-        num_bboxes = 3
+        B = 3
         S = 7
-        boundary = (S * S * num_classes, S * S * (num_classes + num_bboxes))
-        probs = x[:, :boundary[0]]
-        probs = probs.view(-1, S, S, num_classes)
+        boundary = (S * S * num_classes, S * S * (num_classes + B))
+        probs_temp = x[:, :boundary[0]]
+        probs_temp = probs_temp.view(-1, S, S, num_classes)
+        probs = torch.zeros(probs_temp.size()[0], S, S, B, num_classes)
+        for bbox_id in range(B):
+            probs[..., bbox_id, :] = probs_temp
+
         confs = x[:, boundary[0]:boundary[1]]
-        confs = confs.view(-1, S, S, num_bboxes)
+        confs = confs.view(-1, S, S, B)
         coords = x[:, boundary[1]:]
-        coords = coords.view(-1, S, S, num_bboxes, 4)
+        coords = coords.view(-1, S, S, B, 4)
         return [probs], [confs], [coords]
 
 
@@ -165,13 +169,17 @@ class TinyYOLOv1Backbone(nn.Module):
         x = self.fc1(x)
         """1470"""
         num_classes = 20
-        num_bboxes = 2
+        B = 2
         S = 7
-        boundary = (S * S * num_classes, S * S * (num_classes + num_bboxes))
-        probs = x[:, :boundary[0]]
-        probs = probs.view(-1, S, S, num_classes)
+        boundary = (S * S * num_classes, S * S * (num_classes + B))
+        probs_temp = x[:, :boundary[0]]
+        probs_temp = probs_temp.view(-1, S, S, num_classes)
+        probs = torch.zeros(probs_temp.size()[0], S, S, B, num_classes)
+        for bbox_id in range(B):
+            probs[..., bbox_id, :] = probs_temp
+
         confs = x[:, boundary[0]:boundary[1]]
-        confs = confs.view(-1, S, S, num_bboxes)
+        confs = confs.view(-1, S, S, B)
         coords = x[:, boundary[1]:]
-        coords = coords.view(-1, S, S, num_bboxes, 4)
+        coords = coords.view(-1, S, S, B, 4)
         return [probs], [confs], [coords]
