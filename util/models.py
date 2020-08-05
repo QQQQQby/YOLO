@@ -14,6 +14,7 @@ import cv2
 import matplotlib.pyplot as plt
 import time
 from multiprocessing import Pool
+from scipy.special import expit as sigmoid
 
 
 class YOLO:
@@ -182,10 +183,8 @@ class YOLO:
             bbox_ids, image_ids, row_ids, col_ids, class_ids = np.where(scores >= score_threshold)
             for i in range(len(bbox_ids)):
                 bbox_id = bbox_ids[i]
-                x_label = "x" + str(bbox_id)
-                y_label = "y" + str(bbox_id)
-                w_label = "w" + str(bbox_id)
-                h_label = "h" + str(bbox_id)
+                xy_label = "xy" + str(bbox_id)
+                wh_label = "wh" + str(bbox_id)
                 class_id = class_ids[i]
                 image_id = image_ids[i]
                 row = row_ids[i]
@@ -193,10 +192,10 @@ class YOLO:
                 candidates[image_id][class_id].append({
                     "name": self.classes[class_id],
                     "score": scores[bbox_id, image_id, row, col, class_id],
-                    "x": current_output[x_label][image_id, row, col],
-                    "y": current_output[y_label][image_id, row, col],
-                    "w": current_output[w_label][image_id, row, col],
-                    "h": current_output[h_label][image_id, row, col]
+                    "x": current_output[xy_label][image_id, row, col, 0],
+                    "y": current_output[xy_label][image_id, row, col, 1],
+                    "w": current_output[wh_label][image_id, row, col, 0],
+                    "h": current_output[wh_label][image_id, row, col, 1]
                 })
 
         b = time.time()
@@ -242,55 +241,44 @@ class YOLO:
         for detect_layer_id, output_dict in enumerate(output_dicts):
             B = output_dict["B"]
             S = output_dict["S"]
-
-            current_result = {}
-            for key in output_dict:
-                current_result[key] = output_dict[key]
+            current_result = {"B": B, "S": S}
             for bbox_id in range(B):
-                x_label = "x" + str(bbox_id)
-                y_label = "y" + str(bbox_id)
-                w_label = "w" + str(bbox_id)
-                h_label = "h" + str(bbox_id)
+                xy_label = "xy" + str(bbox_id)
+                wh_label = "wh" + str(bbox_id)
                 c_label = "c" + str(bbox_id)
                 p_label = "p" + str(bbox_id)
-                current_result[x_label] = current_result[x_label].cpu().numpy()
-                current_result[y_label] = current_result[y_label].cpu().numpy()
-                current_result[w_label] = current_result[w_label].cpu().numpy()
-                current_result[h_label] = current_result[h_label].cpu().numpy()
-                current_result[c_label] = current_result[c_label].cpu().numpy()
-                current_result[p_label] = current_result[p_label].cpu().numpy()
+                current_result[xy_label] = output_dict[xy_label].detach().cpu().numpy()
+                current_result[wh_label] = output_dict[wh_label].detach().cpu().numpy()
+                current_result[c_label] = output_dict[c_label].detach().cpu().numpy()
+                current_result[p_label] = output_dict[p_label].detach().cpu().numpy()
             if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
                 for bbox_id in range(B):
-                    x_label = "x" + str(bbox_id)
-                    y_label = "y" + str(bbox_id)
-                    w_label = "w" + str(bbox_id)
-                    h_label = "h" + str(bbox_id)
+                    xy_label = "xy" + str(bbox_id)
+                    wh_label = "wh" + str(bbox_id)
                     col_offsets = np.resize(np.arange(S), [S, S])
-                    current_result[x_label] = (current_result[x_label] + col_offsets) * (self.image_size - 1) / S
+                    current_result[xy_label][..., 0] = (current_result[xy_label][..., 0] + col_offsets)
                     row_offsets = col_offsets.transpose()
-                    current_result[y_label] = (current_result[y_label] + row_offsets) * (self.image_size - 1) / S
-                    current_result[w_label] = current_result[w_label] ** 2 * self.image_size
-                    current_result[h_label] = current_result[h_label] ** 2 * self.image_size
+                    current_result[xy_label][..., 1] = (current_result[xy_label][..., 1] + row_offsets)
+                    current_result[xy_label] = current_result[xy_label] * ((self.image_size - 1) / S)
+                    current_result[wh_label] = current_result[wh_label] ** 2 * self.image_size
             elif isinstance(self.backbone, YOLOv3Backbone):
                 for bbox_id in range(B):
-                    x_label = "x" + str(bbox_id)
-                    y_label = "y" + str(bbox_id)
-                    w_label = "w" + str(bbox_id)
-                    h_label = "h" + str(bbox_id)
+                    xy_label = "xy" + str(bbox_id)
+                    wh_label = "wh" + str(bbox_id)
                     c_label = "c" + str(bbox_id)
                     p_label = "p" + str(bbox_id)
                     col_offsets = np.resize(np.arange(S), [S, S])
-                    current_result[x_label] = (sigmoid(current_result[x_label]) + col_offsets) * \
-                                              (self.image_size - 1) / S
+                    current_result[xy_label] = sigmoid(current_result[xy_label])
+                    current_result[xy_label][..., 0] += col_offsets
                     row_offsets = col_offsets.transpose()
-                    current_result[y_label] = (sigmoid(current_result[y_label]) + row_offsets) * \
-                                              (self.image_size - 1) / S
-                    current_result[w_label] = np.exp(current_result[w_label]) * \
-                                              self.anchors[self.anchor_mask[detect_layer_id]][bbox_id, 0]
-                    current_result[h_label] = np.exp(current_result[h_label]) * \
-                                              self.anchors[self.anchor_mask[detect_layer_id]][bbox_id, 1]
+                    current_result[xy_label][..., 1] += row_offsets
+                    current_result[xy_label] *= ((self.image_size - 1) / S)
+                    current_result[wh_label] = np.exp(current_result[wh_label]) * \
+                                               self.anchors[self.anchor_mask[detect_layer_id]][bbox_id]
+                    x = time.time()
                     current_result[c_label] = sigmoid(current_result[c_label])
                     current_result[p_label] = sigmoid(current_result[p_label])
+                    print(time.time() - x, "sigmoid")
             results.append(current_result)
         return results
 
@@ -350,7 +338,6 @@ class YOLO:
         return mmAP
 
     def get_output_dicts(self, images):
-        a = time.time()
         prob_list, conf_list, coord_list = self.backbone(
             torch.from_numpy(np.array(images) / 255.).to(self.device)
         )
@@ -361,22 +348,16 @@ class YOLO:
             num_classes = probs.shape[4]
             current_dict = {}
             for bbox_id in range(B):
-                x_label = "x" + str(bbox_id)
-                y_label = "y" + str(bbox_id)
-                w_label = "w" + str(bbox_id)
-                h_label = "h" + str(bbox_id)
+                xy_label = "xy" + str(bbox_id)
+                wh_label = "wh" + str(bbox_id)
                 c_label = "c" + str(bbox_id)
                 p_label = "p" + str(bbox_id)
-                current_dict[x_label] = coords[..., bbox_id, 0]
-                current_dict[y_label] = coords[..., bbox_id, 1]
-                current_dict[w_label] = coords[..., bbox_id, 2]
-                current_dict[h_label] = coords[..., bbox_id, 3]
+                current_dict[xy_label] = coords[..., bbox_id, :2]
+                current_dict[wh_label] = coords[..., bbox_id, 2:4]
                 current_dict[c_label] = confs[..., bbox_id]
                 current_dict[p_label] = probs[..., bbox_id, :]
             current_dict.update(S=S, B=B, num_classes=num_classes)
             output_dicts.append(current_dict)
-        b = time.time()
-        print("get output:", b - a, "s")
         return output_dicts
 
     def save(self, model_save_path):

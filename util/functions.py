@@ -88,5 +88,5 @@ def NMS_multi_process(inp):
     return NMS(*inp)
 
 
-def sigmoid(array: np.ndarray) -> np.ndarray:
-    return 1 / (1 + np.exp(-array))
+# def sigmoid(array: np.ndarray) -> np.ndarray:
+#     return np.divide(1, (np.add(np.exp(-array), 1)))
