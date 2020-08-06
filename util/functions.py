@@ -39,10 +39,10 @@ def show_objects(image_array: np.ndarray, objects, color_dict, delay=0):
     cv2.waitKey(delay)
 
 
-def draw_image(image_array: np.ndarray, objects, color_dict):
-    image = image_array.copy()
+def draw_image(image: np.ndarray, objects, color_dict):
+    image = image.copy()
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    h, w = image_array.shape[:2]
+    h, w = image.shape[:2]
     upper_left_list = [(max(int(o['x'] - o['w'] // 2), 0), max(int(o['y'] - o['h'] // 2), 0)) for o in objects]
     lower_right_list = [(min(int(o['x'] + o['w'] // 2), w), min(int(o['y'] + o['h'] // 2), h)) for o in objects]
     for i, o in enumerate(objects):
@@ -86,7 +86,6 @@ def NMS(candidates: List, iou_threshold: int) -> List:
 
 def NMS_multi_process(inp):
     return NMS(*inp)
-
 
 # def sigmoid(array: np.ndarray) -> np.ndarray:
 #     return np.divide(1, (np.add(np.exp(-array), 1)))

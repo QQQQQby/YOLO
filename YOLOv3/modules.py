@@ -173,9 +173,7 @@ class YOLOv3Backbone(nn.Module):
 
     def dbl_forward(self, x, conv_id, bn_id):
         conv_layer = getattr(self, 'conv%d' % conv_id)
-        kernel_size = conv_layer.kernel_size
-        stride = conv_layer.stride
-        x = F.pad(x, get_same_paddings(x.shape[-2:], kernel_size, stride))
+        x = F.pad(x, get_same_paddings(x.shape[-2:], conv_layer.kernel_size, conv_layer.stride))
         x = conv_layer(x)
         x = getattr(self, 'batch_norm%d' % bn_id)(x)
         x = F.leaky_relu(x, 0.1, inplace=False)

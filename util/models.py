@@ -240,15 +240,14 @@ class YOLO:
         for detect_layer_id, output_dict in enumerate(output_dicts):
             B = output_dict["B"]
             S = output_dict["S"]
+            offsets = np.zeros([S, S, 2])
+            offsets[..., 0] = np.resize(np.arange(S), [S, S])
+            offsets[..., 1] = offsets[..., 0].transpose()
             if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
                 for bbox_id in range(B):
                     xy_label = "xy" + str(bbox_id)
                     wh_label = "wh" + str(bbox_id)
-                    col_offsets = np.resize(np.arange(S), [S, S])
-                    output_dict[xy_label][..., 0] = (output_dict[xy_label][..., 0] + col_offsets)
-                    row_offsets = col_offsets.transpose()
-                    output_dict[xy_label][..., 1] = (output_dict[xy_label][..., 1] + row_offsets)
-                    output_dict[xy_label] = output_dict[xy_label] * ((self.image_size - 1) / S)
+                    output_dict[xy_label] = (output_dict[xy_label] + offsets) * ((self.image_size - 1) / S)
                     output_dict[wh_label] = output_dict[wh_label] ** 2 * self.image_size
             elif isinstance(self.backbone, YOLOv3Backbone):
                 for bbox_id in range(B):
@@ -256,20 +255,14 @@ class YOLO:
                     wh_label = "wh" + str(bbox_id)
                     c_label = "c" + str(bbox_id)
                     p_label = "p" + str(bbox_id)
-                    col_offsets = np.resize(np.arange(S), [S, S])
                     output_dict[xy_label] = sigmoid(output_dict[xy_label])
-                    output_dict[xy_label][..., 0] += col_offsets
-                    row_offsets = col_offsets.transpose()
-                    output_dict[xy_label][..., 1] += row_offsets
-                    output_dict[xy_label] *= ((self.image_size - 1) / S)
+                    output_dict[xy_label] = (output_dict[xy_label] + offsets) * ((self.image_size - 1) / S)
                     output_dict[xy_label] = np.array(output_dict[xy_label], int)
                     output_dict[wh_label] = np.exp(output_dict[wh_label]) * \
                                             self.anchors[self.anchor_mask[detect_layer_id]][bbox_id]
                     output_dict[wh_label] = np.array(output_dict[wh_label], int)
-                    x = time.time()
                     output_dict[c_label] = sigmoid(output_dict[c_label])
                     output_dict[p_label] = sigmoid(output_dict[p_label])
-                    print(time.time() - x, "sigmoid")
 
     def get_mmAP(self, batch, pred_results=None, iou_thresholds=None):
         if pred_results is None:
@@ -331,16 +324,22 @@ class YOLO:
         prob_list, conf_list, coord_list = self.backbone(
             torch.from_numpy(np.array(images) / 255.).to(self.device)
         )
+        print("ofm:", time.time() - a)
+
+        a = time.time()
+        if tensor_to_numpy:
+            for i in range(len(prob_list)):
+                prob_list[i] = prob_list[i].cpu().numpy()
+                conf_list[i] = conf_list[i].cpu().numpy()
+                coord_list[i] = coord_list[i].cpu().numpy()
+        print("tensor to numpy:", time.time() - a)
+
         output_dicts = []
         for probs, confs, coords in zip(prob_list, conf_list, coord_list):
-            if tensor_to_numpy:
-                probs = probs.cpu().numpy()
-                confs = confs.cpu().numpy()
-                coords = coords.cpu().numpy()
             S = probs.shape[2]
             B = probs.shape[3]
             num_classes = probs.shape[4]
-            current_dict = {}
+            current_dict = {"S": S, "B": B, "num_classes": num_classes}
             for bbox_id in range(B):
                 xy_label = "xy" + str(bbox_id)
                 wh_label = "wh" + str(bbox_id)
@@ -350,9 +349,7 @@ class YOLO:
                 current_dict[wh_label] = coords[..., bbox_id, 2:4]
                 current_dict[c_label] = confs[..., bbox_id]
                 current_dict[p_label] = probs[..., bbox_id, :]
-            current_dict.update(S=S, B=B, num_classes=num_classes)
             output_dicts.append(current_dict)
-        print(time.time() - a, "output")
         return output_dicts
 
     def save(self, model_save_path):
@@ -381,15 +378,20 @@ class YOLO:
         while capture.isOpened():
             a = time.time()
             ret, frame = capture.read()
+            b = time.time()
             frame, unresized_frame, paddings = self.preprocess_image(frame, cvt_RGB=True)
+            print("preprocess:", time.time() - b, "s")
             pred_results = self.predict([frame], score_threshold, iou_threshold, num_processes=0)[0]
             pred_results = self.unpreprocess_objects(pred_results, unresized_frame.shape, paddings)
+            b = time.time()
             unresized_frame = draw_image(unresized_frame, pred_results, color_dict)
-            cv2.namedWindow("Object Detection", 0)
+            print("draw:", time.time() - b, "s")
+            b = time.time()
+            cv2.namedWindow("Object Detection", cv2.WINDOW_AUTOSIZE)
             cv2.resizeWindow("Object Detection", unresized_frame.shape[1], unresized_frame.shape[0])
             cv2.imshow("Object Detection", unresized_frame)
-            b = time.time()
-            print("total time:", b - a, "s")
+            print("show:", time.time() - b, "s")
+            print("total time:", time.time() - a, "s")
             print()
             cv2.waitKey(delay)
 
