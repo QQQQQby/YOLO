@@ -62,7 +62,7 @@ def show_objects(image_array: np.ndarray, objects, color_dict, delay=0):
 #     return image
 
 
-def draw_image(image: np.ndarray, objects, color_dict):
+def draw_image(image: np.ndarray, objects, color_dict, fontSize=20):
     image = image.copy()
     h, w = image.shape[:2]
     upper_left_list = [(max(int(o['x'] - o['w'] // 2), 0), max(int(o['y'] - o['h'] // 2), 0)) for o in objects]
@@ -71,10 +71,10 @@ def draw_image(image: np.ndarray, objects, color_dict):
     draw = ImageDraw.Draw(img)
     for i, o in enumerate(objects):
         draw.rectangle([upper_left_list[i], lower_right_list[i]], outline=color_dict[o['name']], width=3)
-    font = ImageFont.truetype("simsun.ttc", 20, encoding="unic")
+    font = ImageFont.truetype("simsun.ttc", fontSize, encoding="utf-8")
     for i, o in enumerate(objects):
-        upper_left = (upper_left_list[i][0], upper_left_list[i][1] - 20)
-        lower_right = (upper_left_list[i][0] + len(o['name']) * 20, upper_left_list[i][1])
+        upper_left = (max(upper_left_list[i][0], 0), max(upper_left_list[i][1] - fontSize, 0))
+        lower_right = (upper_left[0] + len(o['name']) * fontSize, upper_left[1] + fontSize)
         draw.rectangle([upper_left, lower_right], fill=color_dict[o['name']])
         draw.text(upper_left, o['name'], font=font, fill=(0, 0, 0))
     image = np.array(img)
