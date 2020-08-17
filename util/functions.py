@@ -1,6 +1,7 @@
 # coding: utf-8
 
 import cv2
+from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from typing import List, Tuple, Dict, Union
 
@@ -39,25 +40,45 @@ def show_objects(image_array: np.ndarray, objects, color_dict, delay=0):
     cv2.waitKey(delay)
 
 
+# def draw_image(image: np.ndarray, objects, color_dict):
+#     image = image.copy()
+#     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+#     h, w = image.shape[:2]
+#     upper_left_list = [(max(int(o['x'] - o['w'] // 2), 0), max(int(o['y'] - o['h'] // 2), 0)) for o in objects]
+#     lower_right_list = [(min(int(o['x'] + o['w'] // 2), w), min(int(o['y'] + o['h'] // 2), h)) for o in objects]
+#     for i, o in enumerate(objects):
+#         cv2.rectangle(image, upper_left_list[i], lower_right_list[i], color_dict[o['name']][::-1], 2)
+#         # cv2.rectangle(image, upper_left, lower_right, (255, 0, 0)[::-1], 1)
+#     for i, o in enumerate(objects):
+#         cv2.rectangle(
+#             image,
+#             upper_left_list[i],
+#             (upper_left_list[i][0] + len(o['name'] * 10), max(upper_left_list[i][1] - 16, 0)),
+#             color_dict[o['name']][::-1],
+#             -1
+#         )
+#         upper_left = (upper_left_list[i][0] + 2, max(upper_left_list[i][1] - 4, 12))
+#         cv2.putText(image, o['name'], upper_left, cv2.FONT_HERSHEY_TRIPLEX, 0.4, (255, 255, 255)[::-1], 1)
+#     return image
+
+
 def draw_image(image: np.ndarray, objects, color_dict):
     image = image.copy()
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     h, w = image.shape[:2]
     upper_left_list = [(max(int(o['x'] - o['w'] // 2), 0), max(int(o['y'] - o['h'] // 2), 0)) for o in objects]
     lower_right_list = [(min(int(o['x'] + o['w'] // 2), w), min(int(o['y'] + o['h'] // 2), h)) for o in objects]
+    img = Image.fromarray(image)
+    draw = ImageDraw.Draw(img)
     for i, o in enumerate(objects):
-        cv2.rectangle(image, upper_left_list[i], lower_right_list[i], color_dict[o['name']][::-1], 2)
-        # cv2.rectangle(image, upper_left, lower_right, (255, 0, 0)[::-1], 1)
+        draw.rectangle([upper_left_list[i], lower_right_list[i]], outline=color_dict[o['name']], width=3)
+    font = ImageFont.truetype("simsun.ttc", 20, encoding="unic")
     for i, o in enumerate(objects):
-        cv2.rectangle(
-            image,
-            upper_left_list[i],
-            (upper_left_list[i][0] + len(o['name'] * 10), max(upper_left_list[i][1] - 16, 0)),
-            color_dict[o['name']][::-1],
-            -1
-        )
-        upper_left = (upper_left_list[i][0] + 2, max(upper_left_list[i][1] - 4, 12))
-        cv2.putText(image, o['name'], upper_left, cv2.FONT_HERSHEY_TRIPLEX, 0.4, (255, 255, 255)[::-1], 1)
+        upper_left = (upper_left_list[i][0], upper_left_list[i][1] - 20)
+        lower_right = (upper_left_list[i][0] + len(o['name']) * 20, upper_left_list[i][1])
+        draw.rectangle([upper_left, lower_right], fill=color_dict[o['name']])
+        draw.text(upper_left, o['name'], font=font, fill=(0, 0, 0))
+    image = np.array(img)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     return image
 
 

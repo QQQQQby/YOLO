@@ -148,7 +148,7 @@ class VOCDataLoader(DataLoader):
 
 
 def read_classes(path):
-    with open(path, "r") as f:
+    with open(path, "r", encoding='utf-8') as f:
         return f.read().strip().split("\n")
 
 
@@ -156,7 +156,7 @@ def get_color_dict(classes, color_path):
     color_dict = {}
     with open(color_path, "r") as f:
         for c in classes:
-            color_dict[c] = [int(t) for t in f.readline().split(" ")]
+            color_dict[c] = tuple([int(t) for t in f.readline().split(" ")])
     return color_dict
 
 
