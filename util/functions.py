@@ -74,9 +74,15 @@ def draw_image(image: np.ndarray, objects, color_dict, fontSize=20):
     font = ImageFont.truetype("simsun.ttc", fontSize, encoding="utf-8")
     for i, o in enumerate(objects):
         upper_left = (max(upper_left_list[i][0], 0), max(upper_left_list[i][1] - fontSize, 0))
+        if upper_left[0] >= w or upper_left[1] >= h:
+            continue
         lower_right = (upper_left[0] + len(o['name']) * fontSize, upper_left[1] + fontSize)
         draw.rectangle([upper_left, lower_right], fill=color_dict[o['name']])
-        draw.text(upper_left, o['name'], font=font, fill=(0, 0, 0))
+        draw.text(
+            upper_left,
+            o['name'],
+            font=font,
+            fill=(0, 0, 0))
     image = np.array(img)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     return image
@@ -108,5 +114,11 @@ def NMS(candidates: List, iou_threshold: int) -> List:
 def NMS_multi_process(inp):
     return NMS(*inp)
 
+
 # def sigmoid(array: np.ndarray) -> np.ndarray:
-#     return np.divide(1, (np.add(np.exp(-array), 1)))
+#     array = array.copy()
+#     posIndexes = np.where(array > 0)
+#     negIndexes = np.where(array <= 0)
+#     array[posIndexes] = np.divide(1, (np.add(np.exp(-array[posIndexes]), 1)))
+#     array[negIndexes] = np.divide(np.exp(array[negIndexes]), (np.add(np.exp(array[negIndexes]), 1)))
+#     return array

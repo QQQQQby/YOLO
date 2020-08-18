@@ -158,18 +158,10 @@ class YOLOv3Backbone(nn.Module):
         o1 = o1.view(*(o1.size()[:3]), B, num_classes + 5)
         o2 = o2.view(*(o2.size()[:3]), B, num_classes + 5)
         o3 = o3.view(*(o3.size()[:3]), B, num_classes + 5)
-        prob_list, coord_list, conf_list = [], [], []
-        coord_list.append(o1[..., :4])
-        coord_list.append(o2[..., :4])
-        coord_list.append(o3[..., :4])
-        conf_list.append(o1[..., 4])
-        conf_list.append(o2[..., 4])
-        conf_list.append(o3[..., 4])
-        prob_list.append(o1[..., 5:])
-        prob_list.append(o2[..., 5:])
-        prob_list.append(o3[..., 5:])
-
-        return prob_list, conf_list, coord_list
+        coords = [o1[..., :4], o2[..., :4], o3[..., :4]]
+        confs = [o1[..., 4], o2[..., 4], o3[..., 4]]
+        probs = [o1[..., 5:], o2[..., 5:], o3[..., 5:]]
+        return probs, confs, coords
 
     def dbl_forward(self, x, conv_id, bn_id):
         conv_layer = getattr(self, 'conv%d' % conv_id)
@@ -187,9 +179,9 @@ class YOLOv3Backbone(nn.Module):
         return x
 
 
-from torch.utils import tensorboard
-
-if __name__ == '__main__':
-    m = YOLOv3Backbone()
-    with tensorboard.SummaryWriter("log") as writer:
-        writer.add_graph(m, [torch.rand(1, 608, 608, 3)])
+# from torch.utils import tensorboard
+#
+# if __name__ == '__main__':
+#     m = YOLOv3Backbone()
+#     with tensorboard.SummaryWriter("log") as writer:
+#         writer.add_graph(m, [torch.rand(1, 608, 608, 3)])

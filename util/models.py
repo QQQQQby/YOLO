@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import time
 from multiprocessing import Pool
 from scipy.special import expit as sigmoid
+from moviepy.editor import ImageSequenceClip
 
 
 class YOLO:
@@ -52,7 +53,7 @@ class YOLO:
         if isinstance(self.backbone, YOLOv1Backbone) or isinstance(self.backbone, TinyYOLOv1Backbone):
             self.image_size = 448
         elif isinstance(self.backbone, YOLOv3Backbone):
-            self.image_size = 416
+            self.image_size = 608
             self.anchor_mask = [[6, 7, 8], [3, 4, 5], [0, 1, 2]]
             self.anchors = anchors
 
@@ -359,41 +360,61 @@ class YOLO:
         with SummaryWriter(log_dir=graph_save_dir) as writer:
             writer.add_graph(self.backbone, [torch.rand(1, self.image_size, self.image_size, 3)])
 
-    def detect_image_and_show(self, image_path, score_threshold, iou_threshold, color_dict, delay):
+    def detect_image(self, image_path, score_threshold, iou_threshold, color_dict,
+                     do_show=True, delay=0, output_path=None, num_processes=0):
+        print("Input:", image_path)
+        print("Output:", output_path)
         a = time.time()
         im, unresized_im, paddings = self.preprocess_image(image_path, cvt_RGB=True)
-        pred_results = self.predict([im], score_threshold, iou_threshold, num_processes=0)[0]
+        pred_results = self.predict([im], score_threshold, iou_threshold, num_processes=num_processes)[0]
         pred_results = self.unpreprocess_objects(pred_results, unresized_im.shape, paddings)
         print(pred_results)
         b = time.time()
         print("total time:", b - a, "s")
         print()
-        show_objects(unresized_im, pred_results, color_dict, delay)
+        if do_show:
+            show_objects(unresized_im, pred_results, color_dict, delay)
+        if output_path is not None:
+            image = draw_image(unresized_im, pred_results, color_dict)
+            cv2.imwrite(output_path, image)
 
-    def detect_video_and_show(self, video_path, score_threshold, iou_threshold, color_dict, delay):
+    def detect_video(self, video_path, score_threshold, iou_threshold, color_dict,
+                     do_show=True, delay=1, output_path=None, num_processes=0):
         if video_path == "0":
             capture = cv2.VideoCapture(0)
         else:
             capture = cv2.VideoCapture(video_path)
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        print('fps = ', fps)
+        imgs = []
         while capture.isOpened():
             a = time.time()
             ret, frame = capture.read()
+            if not ret:
+                break
             b = time.time()
             frame, unresized_frame, paddings = self.preprocess_image(frame, cvt_RGB=True)
             print("preprocess:", time.time() - b, "s")
-            pred_results = self.predict([frame], score_threshold, iou_threshold, num_processes=0)[0]
+            pred_results = self.predict([frame], score_threshold, iou_threshold, num_processes=num_processes)[0]
             pred_results = self.unpreprocess_objects(pred_results, unresized_frame.shape, paddings)
             b = time.time()
             unresized_frame = draw_image(unresized_frame, pred_results, color_dict)
             print("draw:", time.time() - b, "s")
-            b = time.time()
-            cv2.namedWindow("Object Detection", cv2.WINDOW_AUTOSIZE)
-            cv2.resizeWindow("Object Detection", unresized_frame.shape[1], unresized_frame.shape[0])
-            cv2.imshow("Object Detection", unresized_frame)
-            print("show:", time.time() - b, "s")
+
+            if do_show:
+                b = time.time()
+                cv2.namedWindow("Object Detection", cv2.WINDOW_AUTOSIZE)
+                cv2.resizeWindow("Object Detection", unresized_frame.shape[1], unresized_frame.shape[0])
+                cv2.imshow("Object Detection", unresized_frame)
+                print("show:", time.time() - b, "s")
+                cv2.waitKey(delay)
+            if output_path is not None:
+                imgs.append(cv2.cvtColor(unresized_frame, cv2.COLOR_BGR2RGB))
             print("total time:", time.time() - a, "s")
             print()
-            cv2.waitKey(delay)
+        if output_path is not None:
+            clip = ImageSequenceClip(imgs, fps)
+            clip.write_videofile(output_path, codec='mpeg4')
 
     def preprocess_image(self, image, objects=None, cvt_RGB=True):
         if isinstance(image, str):
