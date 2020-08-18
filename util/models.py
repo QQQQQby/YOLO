@@ -156,7 +156,7 @@ class YOLO:
                             loss += lambda_noobj * (output_dict[c_label][data_id, i, j] - 0) ** 2
         return loss
 
-    def predict(self, images, score_threshold, iou_threshold, output_dicts=None, num_processes=8):
+    def predict(self, images, score_threshold, iou_threshold, output_dicts=None, num_processes=0):
         self.backbone.eval()
         if output_dicts is None:
             with torch.no_grad():
@@ -196,7 +196,8 @@ class YOLO:
                     "x": current_output[xy_label][image_id, row, col, 0],
                     "y": current_output[xy_label][image_id, row, col, 1],
                     "w": current_output[wh_label][image_id, row, col, 0],
-                    "h": current_output[wh_label][image_id, row, col, 1]
+                    "h": current_output[wh_label][image_id, row, col, 1],
+                    "preprocessed": True
                 })
 
         b = time.time()
@@ -365,7 +366,7 @@ class YOLO:
         print("Input:", image_path)
         print("Output:", output_path)
         a = time.time()
-        im, unresized_im, paddings = self.preprocess_image(image_path, cvt_RGB=True)
+        im, unresized_im, paddings = self.preprocess_image(image_path)
         pred_results = self.predict([im], score_threshold, iou_threshold, num_processes=num_processes)[0]
         pred_results = self.unpreprocess_objects(pred_results, unresized_im.shape, paddings)
         print(pred_results)
@@ -393,7 +394,7 @@ class YOLO:
             if not ret:
                 break
             b = time.time()
-            frame, unresized_frame, paddings = self.preprocess_image(frame, cvt_RGB=True)
+            frame, unresized_frame, paddings = self.preprocess_image(frame)
             print("preprocess:", time.time() - b, "s")
             pred_results = self.predict([frame], score_threshold, iou_threshold, num_processes=num_processes)[0]
             pred_results = self.unpreprocess_objects(pred_results, unresized_frame.shape, paddings)
@@ -416,10 +417,10 @@ class YOLO:
             clip = ImageSequenceClip(imgs, fps)
             clip.write_videofile(output_path, codec='mpeg4')
 
-    def preprocess_image(self, image, objects=None, cvt_RGB=True):
+    def preprocess_image(self, image, objects=None, convert_channels=True):
         if isinstance(image, str):
             image = cv2.imread(image)
-        if cvt_RGB:
+        if convert_channels:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         org_height, org_width = image.shape[:2]
         """resize"""
@@ -437,10 +438,11 @@ class YOLO:
         image = cv2.resize(image, (pre_width, pre_height))
         image = cv2.copyMakeBorder(image, padding_top, padding_bottom, padding_left, padding_right,
                                    cv2.BORDER_CONSTANT, (0, 0, 0))
+        paddings = (padding_left, padding_right, padding_top, padding_bottom)
 
         if objects is not None:
             for obj in objects:
-                if obj.get("fixed", False):
+                if obj.get("preprocessed", False):
                     continue
                 obj["x"] = obj["x"] / (org_width - 1) * (pre_width - 1)
                 obj["y"] = obj["y"] / (org_height - 1) * (pre_height - 1)
@@ -448,18 +450,20 @@ class YOLO:
                 obj["y"] += padding_top
                 obj["w"] = obj["w"] / org_width * pre_width
                 obj["h"] = obj["h"] / org_height * pre_height
-                obj["fixed"] = True
+                obj["preprocessed"] = True
 
-        return image, unresized_image, (padding_top, padding_bottom, padding_left, padding_right)
+        return image, unresized_image, paddings
 
     def unpreprocess_objects(self, objects, org_shape, paddings):
         prop = max(org_shape[:2]) / self.image_size
         for obj in objects:
-            obj["x"] -= paddings[2]
-            obj["y"] -= paddings[0]
+            if not obj.get("preprocessed", False):
+                continue
+            obj["x"] -= paddings[0]
+            obj["y"] -= paddings[2]
             obj["x"] *= prop
             obj["y"] *= prop
             obj["w"] *= prop
             obj["h"] *= prop
-            obj["fixed"] = False
+            obj["preprocessed"] = False
         return objects
