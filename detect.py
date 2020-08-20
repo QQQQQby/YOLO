@@ -1,12 +1,9 @@
 # coding: utf-8
 
 import argparse
-import torch
 
 from util.loaders import read_classes, get_color_dict, read_anchors
-from util.models import YOLO
-from YOLOv1.modules import YOLOv1Backbone, TinyYOLOv1Backbone
-from YOLOv3.modules import YOLOv3Backbone
+from models import YOLO
 
 
 def parse_args():
