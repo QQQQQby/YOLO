@@ -71,7 +71,7 @@ def draw_image(image: np.ndarray, objects, color_dict, fontSize=20):
     draw = ImageDraw.Draw(img)
     for i, o in enumerate(objects):
         draw.rectangle([upper_left_list[i], lower_right_list[i]], outline=color_dict[o['name']], width=3)
-    font = ImageFont.truetype("simsun.ttc", fontSize, encoding="utf-8")
+    font = ImageFont.truetype("simsun.ttf", fontSize, encoding="utf-8")
     for i, o in enumerate(objects):
         upper_left = (max(upper_left_list[i][0], 0), max(upper_left_list[i][1] - fontSize, 0))
         if upper_left[0] >= w or upper_left[1] >= h:
