@@ -20,18 +20,19 @@ def after_request(response):
 
 app = Flask(__name__)
 app.after_request(after_request)
-
+out_dir = "./data/images"
+model_path = "./models/yolov3.pth"
 
 @app.route('/detection/', methods=['POST'])
 def upload():
     global model_lock, model, model_use_time
     model_lock.acquire()
     if model.backbone is None:
-        model.backbone = torch.load("./models/yolov3.pth").cuda()
+        model.backbone = torch.load(model_path).cuda()
     f = request.files["image"]
     print("Receive image:", f.filename)
-    in_path = os.path.join("./data/images", f.filename)
-    out_path = os.path.join("./data/images", f.filename.split(".")[0] + "_pred.jpg")
+    in_path = os.path.join(out_dir, f.filename)
+    out_path = os.path.join(out_dir, f.filename.split(".")[0] + "_pred.jpg")
     if not os.path.exists(out_path):
         f.save(in_path)
         model.detect_image(
@@ -72,9 +73,12 @@ if __name__ == '__main__':
     color_dict = get_color_dict(classes, "./data/colors")
     anchors = read_anchors("./data/anchors")
     model = YOLO(classes,
-                 model_load_path="./models/yolov3.pth",
+                 model_load_path=model_path,
                  anchors=anchors,
                  device_ids="0")
+
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
 
     model_use_time = time.time()
     model_lock = threading.Lock()
