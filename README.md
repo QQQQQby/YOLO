@@ -13,74 +13,64 @@ The full name of **YOLO** is **Y**ou **O**nly **L**ook **O**nce. It is a popular
 * Python>=3.5
 * Pytorch>=1.4
 * OpenCV
+* moviepy
+* scipy
+* PIL
 
-## How to run
+## Detect
 
 You can run:
 
 ```
-python run_classifier.py
-    --model_load_path=%MODEL_PATH%
-    --video_detect_path=%VIDEO_PATH%
-    --use_cuda
+python detect.py
+    --model_load_path=models/yolov3.pth
+    --class_path=data/coco-ch.names
+    --input_path=data/dog.jpg
+    --output_path=data/dog_pred.jpg
+    --device_ids=0
 ```
 
 Now enjoy!
 
-And there are some other optional arguments:
+All usages and optional arguments:
 ```
+ usage: detect.py [-h] [--model_load_path MODEL_LOAD_PATH]
+                 [--class_path CLASS_PATH] [--color_path COLOR_PATH]
+                 [--anchor_path ANCHOR_PATH] [--input_path INPUT_PATH]
+                 [--output_path OUTPUT_PATH] [--not_show]
+                 [--score_threshold SCORE_THRESHOLD]
+                 [--iou_threshold IOU_THRESHOLD] [--device_ids DEVICE_IDS]
+                 [--num_processes NUM_PROCESSES]
+
+Object detection.
+
+optional arguments:
   -h, --help            show this help message and exit
-  --image_detect_path IMAGE_DETECT_PATH
-                        Image path for detection. If empty, the detection will
-                        not perform.
-  --video_detect_path VIDEO_DETECT_PATH
-                        Image path for detection. If zero, OpenCV will predict
-                        through camera. If empty, the detection will not
-                        perform.
-  --dataset_path DATASET_PATH
-                        Dataset path.
-  --preload             Whether to preload the dataset.
   --model_load_path MODEL_LOAD_PATH
-                        Input path for models.
-  --model_name {yolov1,yolov1-tiny}
-                        Model type. optional models: yolov1(default),
-                        yolov1-tiny. Not required when the loading path of the
-                        model is specified.
+                        Input path to models.
   --class_path CLASS_PATH
-                        Path for a file to store names and colors of the classes.
-  --graph_save_dir GRAPH_SAVE_DIR
-                        Output directory for the graph of the model. If empty,
-                        graph will not be saved.
-  --use_cuda            Whether to use cuda to run the model.
-  --do_train            Whether to train the model on dataset.
-  --train_batch_size TRAIN_BATCH_SIZE
-                        Batch size of train set.
-  --num_epochs NUM_EPOCHS
-                        Number of epochs.
-  --lr LR               Learning rate.
-  --momentum MOMENTUM   Momentum of optimizer.
-  --lambda_coord LAMBDA_COORD
-                        Lambda of coordinates.
-  --lambda_noobj LAMBDA_NOOBJ
-                        Lambda with no objects.
-  --clip_max_norm CLIP_MAX_NORM
-                        Max norm of the gradients. If zero, the gradients will
-                        not be clipped.
-  --model_save_dir MODEL_SAVE_DIR
-                        Output directory for the model. When empty, the model
-                        will not be saved
-  --do_eval             Whether to evaluate the model on dataset.
-  --eval_batch_size EVAL_BATCH_SIZE
-                        Batch size of evaluation set.
+                        Path to a file to store names and colors of the
+                        classes.
+  --color_path COLOR_PATH
+                        Path to a file which stores colors.
+  --anchor_path ANCHOR_PATH
+                        Input path to anchors.
+  --input_path INPUT_PATH
+                        Path to the file used for detection. If zero, camera
+                        on your computer will be used.
+  --output_path OUTPUT_PATH
+                        Path to the output image or video. If Empty, the
+                        predicted image will not be saved.
+  --not_show            Whether not to show predictions.
   --score_threshold SCORE_THRESHOLD
                         Threshold of score(IOU * P(Object)).
   --iou_threshold IOU_THRESHOLD
                         Threshold of IOU used for calculation of NMS.
-  --iou_thresholds_mmAP IOU_THRESHOLDS_MMAP
-                        Thresholds of IOU used for calculation of mmAP.
-  --do_test             Whether to test the model.
-  --test_batch_size TEST_BATCH_SIZE
-                        Batch size of test set.
+  --device_ids DEVICE_IDS
+                        Device ids. Should be seperated by commas. -1 means
+                        cpu.
+  --num_processes NUM_PROCESSES
+                        number of processes.
 ```
 
 ## Transform .weights to .pth

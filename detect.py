@@ -11,7 +11,7 @@ def parse_args():
     parser.add_argument('--model_load_path', type=str, default='',
                         help='Input path to models.')
     parser.add_argument('--class_path', type=str, default='data/coco.names',
-                        help='Path to a file to store names and colors of the classes.')
+                        help='Path to a file to store names of the classes.')
     parser.add_argument('--color_path', type=str, default='data/colors',
                         help='Path to a file which stores colors.')
     parser.add_argument('--anchor_path', type=str, default='data/anchors',
