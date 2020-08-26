@@ -73,6 +73,12 @@ optional arguments:
                         number of processes.
 ```
 
+## Run with flask
+
+```
+python run_flask.py
+```
+
 ## Transform .weights to .pth
 
 We firstly use `.weights` and `.cfg` files to generate and save a Tensorflow model. The table below shows how to do this.
