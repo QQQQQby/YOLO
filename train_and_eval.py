@@ -7,7 +7,7 @@ from tqdm import tqdm
 import time
 
 from util.loaders import VOCDataLoader, read_classes, get_color_dict
-from util.models import YOLO
+from models import YOLO
 import argparse
 
 

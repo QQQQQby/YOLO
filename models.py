@@ -7,11 +7,9 @@ from YOLOv3.modules import YOLOv3Backbone
 
 import torch
 from torch import nn, optim
-from torch.utils.tensorboard import SummaryWriter
 import os
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 import time
 from multiprocessing import Pool
 from scipy.special import expit as sigmoid
@@ -358,6 +356,7 @@ class YOLO:
         torch.save(self.backbone, model_save_path)
 
     def save_graph(self, graph_save_dir):
+        from torch.utils.tensorboard import SummaryWriter
         with SummaryWriter(log_dir=graph_save_dir) as writer:
             writer.add_graph(self.backbone, [torch.rand(1, self.image_size, self.image_size, 3)])
 

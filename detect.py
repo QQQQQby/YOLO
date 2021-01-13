@@ -23,8 +23,8 @@ def parse_args():
     parser.add_argument('--output_path', type=str, default='',
                         help='Path to the output image or video. '
                              'If Empty, the predicted image will not be saved.')
-    parser.add_argument('--not_show', action='store_true', default=False,
-                        help="Whether not to show predictions.")
+    parser.add_argument('--do_show', action='store_true', default=False,
+                        help="Whether to show predictions.")
 
     parser.add_argument('--score_threshold', type=float, default=0.5,
                         help='Threshold of score(IOU * P(Object)).')
@@ -56,7 +56,7 @@ if __name__ == '__main__':
             args["score_threshold"],
             args["iou_threshold"],
             color_dict,
-            do_show=not args["not_show"],
+            do_show=args["do_show"],
             delay=0,
             output_path=args["output_path"] if args["output_path"] else None
         )
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             args["score_threshold"],
             args["iou_threshold"],
             color_dict,
-            do_show=not args["not_show"],
+            do_show=args["do_show"],
             delay=1,
             output_path=args["output_path"] if args["output_path"] else None
         )
@@ -76,7 +76,7 @@ if __name__ == '__main__':
             args["score_threshold"],
             args["iou_threshold"],
             color_dict,
-            do_show=not args["not_show"],
+            do_show=args["do_show"],
             delay=1,
             output_path=args["output_path"] if args["output_path"] else None
         )
